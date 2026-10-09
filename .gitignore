@@ -1,4 +1,11 @@
+# 빌드 결과물
 /hunsu
 /hunsu-*
+
+# 저장소 루트에서 ./hunsu 를 실행하면 생기는 디자인 작업물과 상태 (프로젝트 소스가 아니다)
+/*.html
+/DESIGN.md
+/design.css
 .hunsu/
+
 .DS_Store
