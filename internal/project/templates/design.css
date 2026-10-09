@@ -1,0 +1,11 @@
+:root {
+  --color-primary: #4f46e5;
+  --color-text: #111827;
+  --color-background: #ffffff;
+  --color-surface: #f9fafb;
+  --space-2: 8px;
+  --space-4: 16px;
+  --space-8: 32px;
+  --radius-md: 8px;
+  --font-body: system-ui, -apple-system, sans-serif;
+}

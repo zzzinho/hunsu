@@ -1,0 +1,155 @@
+import { selectorFor } from './selector.mjs';
+import { isDrag, panPosition } from './tools.mjs';
+
+// 디자인 파일이 아니라 렌더된 문서에만 넣는다. 페이지 CSS 가 덮어쓰지 못하게 id 선택자로 지정한다.
+const OVERLAY_CSS = `
+#hunsu-hover, #hunsu-selected { position: fixed; display: none; pointer-events: none; z-index: 2147483647; box-sizing: border-box; border-radius: 2px; }
+#hunsu-hover { border: 1px solid #e0a64b; background: rgb(224 166 75 / 10%); }
+#hunsu-selected { border: 2px solid #e0a64b; }
+`;
+
+const CURSOR_CSS = {
+  select: '*, *::before, *::after { cursor: default !important; }',
+  hand: '*, *::before, *::after { cursor: grab !important; user-select: none !important; }',
+  panning: '*, *::before, *::after { cursor: grabbing !important; user-select: none !important; }',
+};
+
+export function createFrameTools(frame, { onPick, onKey, onZoom }) {
+  let tool = 'select';
+  let selector = null;
+  let pan = null;
+  let suppressClick = false;
+
+  const doc = () => frame.contentDocument;
+  const win = () => frame.contentWindow;
+
+  function selectedElement() {
+    try {
+      return selector ? doc()?.querySelector(selector) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function place(id, element) {
+    const box = doc()?.getElementById(id);
+    if (!box) return;
+    if (!element) {
+      box.style.display = 'none';
+      return;
+    }
+    const rect = element.getBoundingClientRect();
+    Object.assign(box.style, {
+      display: 'block', left: `${rect.left}px`, top: `${rect.top}px`, width: `${rect.width}px`, height: `${rect.height}px`,
+    });
+  }
+
+  function applyTool() {
+    const style = doc()?.getElementById('hunsu-style');
+    if (style) style.textContent = OVERLAY_CSS + CURSOR_CSS[pan?.moved ? 'panning' : tool];
+    if (tool !== 'select') place('hunsu-hover', null);
+  }
+
+  function select(element) {
+    selector = selectorFor(element);
+    place('hunsu-selected', element);
+    onPick({ selector, html: element.outerHTML }, true);
+  }
+
+  function endPan() {
+    suppressClick = pan.moved;
+    pan = null;
+    applyTool();
+  }
+
+  function onMove(event) {
+    if (pan && !(event.buttons & 1)) endPan();
+    if (pan) {
+      const point = { x: event.clientX, y: event.clientY };
+      pan.moved ||= isDrag(pan.start, point);
+      if (!pan.moved) return;
+      const { left, top } = panPosition(pan.start, point);
+      win().scrollTo(left, top);
+      applyTool();
+      return;
+    }
+    if (tool === 'select') place('hunsu-hover', event.target);
+  }
+
+  function onDown(event) {
+    if (event.button !== 0) return;
+    if (tool === 'select') {
+      event.preventDefault();
+      return;
+    }
+    event.preventDefault();
+    pan = { start: { x: event.clientX, y: event.clientY, scrollX: win().scrollX, scrollY: win().scrollY }, moved: false };
+  }
+
+  function onClick(event) {
+    if (tool === 'select') {
+      event.preventDefault();
+      event.stopPropagation();
+      select(event.target);
+    } else if (suppressClick) {
+      event.preventDefault();
+      event.stopPropagation();
+    }
+    suppressClick = false;
+  }
+
+  function reposition() {
+    place('hunsu-hover', null);
+    place('hunsu-selected', selectedElement());
+  }
+
+  function attach() {
+    const d = doc();
+    if (!d?.documentElement) return;
+    const style = d.createElement('style');
+    style.id = 'hunsu-style';
+    const hover = d.createElement('div');
+    hover.id = 'hunsu-hover';
+    const selected = d.createElement('div');
+    selected.id = 'hunsu-selected';
+    d.documentElement.append(style, hover, selected);
+    applyTool();
+
+    const element = selectedElement();
+    if (element) {
+      place('hunsu-selected', element);
+      onPick({ selector, html: element.outerHTML }, false);
+    } else if (selector) {
+      selector = null;
+      onPick(null, false);
+    }
+
+    d.addEventListener('mousemove', onMove, true);
+    d.addEventListener('mousedown', onDown, true);
+    d.addEventListener('mouseup', () => pan && endPan(), true);
+    d.addEventListener('click', onClick, true);
+    d.addEventListener('keydown', onKey, true);
+    d.addEventListener('wheel', (event) => {
+      if (!event.ctrlKey) return;
+      event.preventDefault();
+      onZoom(event.deltaY);
+    }, { capture: true, passive: false });
+    win().addEventListener('scroll', reposition, true);
+    win().addEventListener('resize', reposition);
+  }
+
+  frame.addEventListener('load', attach);
+
+  return {
+    setTool(next) {
+      tool = next;
+      pan = null;
+      applyTool();
+    },
+    clear() {
+      selector = null;
+      place('hunsu-selected', null);
+      onPick(null, false);
+    },
+  };
+}
