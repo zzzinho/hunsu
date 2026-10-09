@@ -21,6 +21,9 @@ const (
 	Ended   = "end"
 )
 
+// 사용자의 claude 기본 설정과 관계없이 디자인 품질이 가장 좋은 모델을 쓴다.
+const DefaultModel = "opus"
+
 var (
 	ErrBusy        = errors.New("이미 요청을 처리하는 중")
 	ErrEmptyPrompt = errors.New("요청이 비어 있다")
@@ -80,7 +83,7 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(claude.Event)) err
 		Prompt:       userPrompt(t, s.editedSinceLastReply(current)),
 		SystemPrompt: systemPrompt(current),
 		SessionID:    s.session.load(),
-		Model:        t.Model,
+		Model:        cmp.Or(t.Model, DefaultModel),
 	}
 	var sessionID string
 	runErr := s.runner.Run(ctx, req, func(e claude.Event) {

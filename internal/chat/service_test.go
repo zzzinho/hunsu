@@ -146,6 +146,12 @@ func TestService(t *testing.T) {
 				return f.lastRequest().Model
 			},
 			"haiku"},
+		{"모델을 고르지 않으면 opus 로 보낸다",
+			func(f *fixture) string {
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.lastRequest().Model
+			},
+			"opus"},
 		{"첫 응답의 세션을 다음 요청에서 이어간다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "1"})
