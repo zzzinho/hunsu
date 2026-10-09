@@ -13,6 +13,7 @@ import (
 	"hunsu/internal/claude"
 	"hunsu/internal/project"
 	"hunsu/internal/project/projecttest"
+	"hunsu/internal/ui"
 )
 
 type fakeRunner struct {
@@ -115,13 +116,13 @@ func TestService(t *testing.T) {
 		{"선택한 요소의 위치와 HTML 을 함께 보낸다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Page: "a.html", Prompt: "더 크게",
-					Selection: &chat.Selection{Selector: "main > button.cta", HTML: `<button class="cta">시작</button>`}})
+					Selection: &ui.Selection{Selector: "main > button.cta", HTML: `<button class="cta">시작</button>`}})
 				return f.lastRequest().Prompt
 			},
 			"[현재 페이지] a.html\n[선택한 요소] main > button.cta\n<button class=\"cta\">시작</button>\n[요청] 더 크게"},
 		{"선택한 요소의 HTML 이 길면 앞의 2000자만 보낸다",
 			func(f *fixture) string {
-				f.send(chat.Turn{Prompt: "고쳐", Selection: &chat.Selection{Selector: "body", HTML: strings.Repeat("가", 2100)}})
+				f.send(chat.Turn{Prompt: "고쳐", Selection: &ui.Selection{Selector: "body", HTML: strings.Repeat("가", 2100)}})
 				return fmt.Sprint(strings.Count(f.lastRequest().Prompt, "가"))
 			},
 			"2000"},
@@ -178,18 +179,18 @@ func TestService(t *testing.T) {
 				return string(data)
 			},
 			"a"},
-		{"요청을 처리하는 동안 다른 요청과 되돌리기는 받지 않는다",
+		{"요청을 처리하는 동안 다른 요청, 되돌리기, 체크포인트는 받지 않는다",
 			func(f *fixture) string {
 				f.runner.started, f.runner.release = make(chan struct{}), make(chan struct{})
 				done := make(chan string)
 				go func() { done <- f.send(chat.Turn{Prompt: "1"}) }()
 				<-f.runner.started
-				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(claude.Event) {}), " / ", f.svc.Undo())
+				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(claude.Event) {}), " / ", f.svc.Undo(), " / ", f.svc.Checkpoint())
 				close(f.runner.release)
 				<-done
 				return got
 			},
-			chat.ErrBusy.Error() + " / " + chat.ErrBusy.Error()},
+			chat.ErrBusy.Error() + " / " + chat.ErrBusy.Error() + " / " + chat.ErrBusy.Error()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

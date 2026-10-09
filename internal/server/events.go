@@ -1,7 +1,6 @@
 package server
 
 import (
-	"fmt"
 	"net/http"
 	"time"
 
@@ -10,11 +9,8 @@ import (
 
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	poller := watch.NewPoller(s.project.FS(), r.URL.Query()["path"])
-	w.Header().Set("Content-Type", "text/event-stream")
-	w.Header().Set("Cache-Control", "no-store")
-	w.WriteHeader(http.StatusOK)
-	flusher := http.NewResponseController(w)
-	if err := flusher.Flush(); err != nil {
+	stream, err := startEvents(w)
+	if err != nil {
 		return
 	}
 	ticker := time.NewTicker(s.pollEvery)
@@ -24,12 +20,10 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-ticker.C:
-			changed := poller.Poll()
-			for _, name := range changed {
-				fmt.Fprintf(w, "data: %s\n\n", name)
-			}
-			if len(changed) > 0 && flusher.Flush() != nil {
-				return
+			for _, name := range poller.Poll() {
+				if stream.send(name) != nil {
+					return
+				}
 			}
 		}
 	}

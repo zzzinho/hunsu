@@ -13,6 +13,7 @@ import (
 	"hunsu/internal/claude"
 	"hunsu/internal/history"
 	"hunsu/internal/project"
+	"hunsu/internal/ui"
 )
 
 const (
@@ -30,15 +31,10 @@ type Runner interface {
 }
 
 type Turn struct {
-	Prompt    string     `json:"prompt"`
-	Page      string     `json:"page"`
-	Model     string     `json:"model"`
-	Selection *Selection `json:"selection"`
-}
-
-type Selection struct {
-	Selector string `json:"selector"`
-	HTML     string `json:"html"`
+	Prompt    string        `json:"prompt"`
+	Page      string        `json:"page"`
+	Model     string        `json:"model"`
+	Selection *ui.Selection `json:"selection"`
 }
 
 type Service struct {
@@ -117,6 +113,14 @@ func (s *Service) Undo() error {
 	}
 	defer s.mu.Unlock()
 	return s.history.Undo()
+}
+
+func (s *Service) Checkpoint() error {
+	if !s.mu.TryLock() {
+		return ErrBusy
+	}
+	defer s.mu.Unlock()
+	return s.history.Save()
 }
 
 func (s *Service) Reset() error {

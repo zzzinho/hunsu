@@ -108,6 +108,24 @@ function closeAll() {
   openPath.textContent = '';
   frame.removeAttribute('src');
   watch();
+  reportUI();
+}
+
+function reportUI() {
+  fetch('/api/ui', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ page: state.preview ?? '', selection }),
+  }).catch(() => {});
+}
+
+function listenCommands() {
+  const commands = new EventSource('/api/ui/commands');
+  commands.onopen = reportUI;
+  commands.onmessage = ({ data }) => {
+    const command = JSON.parse(data);
+    if (command.kind === 'open') open(command.page);
+  };
 }
 
 async function openExisting() {
@@ -241,6 +259,7 @@ function showSelection(next, picked) {
   chip.querySelector('code').textContent = next?.selector ?? '';
   promptInput.placeholder = next ? '선택한 요소를 어떻게 바꿀까요?' : defaultPlaceholder;
   if (picked) promptInput.focus();
+  reportUI();
 }
 
 function setTool(tool) {
@@ -396,4 +415,5 @@ $('#new-chat').onclick = async () => {
 window.onunhandledrejection = ({ reason }) => { status.textContent = reason.message; };
 
 applyLayout();
+listenCommands();
 await openExisting();

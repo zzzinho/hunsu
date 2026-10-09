@@ -3,7 +3,7 @@
 HTML로 디자인하는 Figma. 로컬에서 서버를 띄우고 브라우저에서 HTML 원본을 직접 고치거나, LLM에게 말로 고치게 한다.
 
 - 작성일: 2026-10-09
-- 상태: 마일스톤 3 완료
+- 상태: 마일스톤 3 완료, Claude Code 연결(MCP) 완료
 
 ## 1. 목표와 비목표
 
@@ -87,7 +87,7 @@ HTML로 디자인하는 Figma. 로컬에서 서버를 띄우고 브라우저에�
 
 ```
 ./hunsu (Go 단일 바이너리)
- ├─ net/http 127.0.0.1:임의포트
+ ├─ net/http 127.0.0.1:7777 (-port 로 변경. MCP 등록 주소가 바뀌지 않도록 고정)
  │   ├─ /            UI (embed.FS)
  │   ├─ /p/*         프로젝트 폴더 정적 서빙 → iframe 렌더 (상대 경로 이미지·CSS 동작)
  │   ├─ /api/files   목록·읽기·쓰기·새 파일
@@ -286,6 +286,7 @@ lipo -create -output hunsu hunsu-arm64 hunsu-amd64
 - [x] **1. 서버 + 렌더 + 소스 편집** — 파일 목록(디자인 시스템 고정), iframe 렌더, CodeMirror 편집·저장, 변경 감지 SSE, 새 파일 템플릿
 - [x] **2. LLM 채팅** — claude -p 실행, 단계별 진행 표시, 세션 이어가기, 디자인 시스템 주입, 수동 편집 알림, 모델 선택, 취소, 스냅샷 되돌리기
 - [x] **3. 요소 선택** — 선택·손 도구, 외곽선, 선택자·HTML 첨부, 새로고침 후 선택 유지
+- [x] **MCP** — Claude Code 연결: `get_context`·`checkpoint`·`undo`·`open_page`, 토큰 인증, 고정 포트 (17)
 - [ ] **4. 패키징과 보안** — 토큰·Host·Origin 검사, `claude` 확인, universal 빌드 (경로 검사는 1 에서 완료)
 
 ## 14. 스파이크 결과 (2026-10-09, claude 2.1.295)
@@ -338,3 +339,34 @@ lipo -create -output hunsu hunsu-arm64 hunsu-amd64
 적용 후 haiku 로 브라우저에서 0.5초마다 진행 표시를 기록한 결과, 32초 동안 표시가 계속 바뀌었다: 시작했습니다 → 파일 여는 중 → 다시 시도하는 중 → DESIGN.md 쓰는 중 · 1.2KB → design.css 쓰는 중 · 2.2KB → index.html 쓰는 중 · 1.2KB … 10.3KB → 답변 쓰는 중 → 완료.
 
 - 빈 프로젝트에서 claude 가 없는 파일을 먼저 읽으려다 실패해 "다시 시도하는 중" 이 두 번 보이고 약 4초를 쓴다. 프롬프트에 현재 파일 목록을 넣으면 줄일 수 있다.
+
+## 17. Claude Code 연결 (MCP)
+
+브라우저 채팅(hunsu 가 `claude -p` 를 실행)과 반대 방향이다. 사용자의 Claude Code 세션이 hunsu 에 MCP 로 접속하고, hunsu 는 화면과 브라우저 상태를 알려주는 쪽이 된다. 두 방식은 함께 쓴다.
+
+**결정**
+
+| 항목 | 결정 | 이유 |
+|---|---|---|
+| 파일 수정 | Claude Code 의 기본 Edit·Write 로 직접 | Claude Code 가 그쪽을 더 잘 쓴다. hunsu 는 파일 변경을 감지해 다시 그리기만 하면 된다 |
+| 도구 | `get_context`, `checkpoint`, `undo`, `open_page` 네 개 | 브라우저 상태를 알려주는 것과 되돌리기 연결만 hunsu 가 해야 하는 일이다 |
+| 전송 방식 | 이미 떠 있는 HTTP 서버의 `/mcp` (Streamable HTTP, 응답 하나짜리) | hunsu 와 브라우저 상태를 공유하려면 같은 프로세스여야 한다. stdio 는 Claude Code 가 별도 프로세스를 띄운다 |
+| 구현 | 표준 라이브러리로 JSON-RPC 직접 처리 (`initialize`, `ping`, `tools/list`, `tools/call`) | 도구 호출만 쓴다. 외부 의존성 0 유지 |
+| 포트 | 기본 7777 고정 | 등록한 MCP 주소가 실행할 때마다 바뀌면 안 된다 |
+| 인증 | `Authorization: Bearer <토큰>`. 토큰은 사용자 설정 폴더에 0600 으로 한 번 만들어 재사용 | `/mcp` 는 파일 되돌리기를 열어 준다. 등록이 깨지지 않도록 토큰도 고정한다 |
+| 화면 상태 | 브라우저가 `POST /api/ui` 로 보는 페이지·선택한 요소를 알린다. 같은 출처(Origin)만 받는다 | 다른 웹사이트가 가짜 선택 요소를 넣어 Claude Code 에 지시를 끼워 넣는 것(프롬프트 주입)을 막는다 |
+| 브라우저 명령 | `GET /api/ui/commands` SSE 로 `open` 명령을 보낸다 | `open_page` 가 브라우저 화면을 움직일 수 있게 |
+| 디자인 규칙 | `internal/project/rules.md` 하나를 브라우저 채팅 지시문과 MCP 안내문이 함께 쓴다 | 두 경로가 같은 규칙을 따르게 |
+
+**실측 (2026-10-09, `claude -p` + `--mcp-config`, haiku)**
+
+브라우저에서 제목을 선택한 뒤 "내가 선택한 요소 글자색을 #dc2626 으로 바꾸고, about.html 을 같은 디자인으로 만들어 브라우저에 열어줘" 로 요청했다. 14.7초.
+
+- Claude Code 는 `get_context` → `checkpoint` → Read → Edit → Write → `open_page` 순으로 썼다. 안내문 순서 그대로다.
+- 브라우저가 `about.html` 로 바뀌었고, 브라우저의 [되돌리기] 한 번으로 `about.html` 삭제와 제목 색이 함께 되돌아갔다.
+- 토큰 없이 `/mcp` 호출은 401, 다른 출처에서 `/api/ui` 위조는 403.
+
+**남은 것**
+
+- `screenshot` 도구: 렌더 결과를 이미지로 돌려줘 Claude Code 가 결과를 보고 다듬게 한다. 서버가 headless Chrome 을 실행해야 해서 미뤘다.
+- Claude Code 가 `open_page` 없이 새 페이지를 만들면 브라우저 파일 목록이 바로 갱신되지 않는다.

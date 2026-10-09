@@ -17,6 +17,7 @@ import (
 	"hunsu/internal/claude"
 	"hunsu/internal/project/projecttest"
 	"hunsu/internal/server"
+	"hunsu/internal/ui"
 )
 
 type startRunner struct{}
@@ -26,7 +27,7 @@ func (startRunner) Run(_ context.Context, _ claude.Request, emit func(claude.Eve
 	return nil
 }
 
-func newServer(t *testing.T) (http.Handler, string) {
+func newServer(t *testing.T) (http.Handler, string, *ui.Hub) {
 	t.Helper()
 	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "notes.txt": "notes.txt"})
 	svc, err := chat.New(p, startRunner{})
@@ -34,7 +35,8 @@ func newServer(t *testing.T) (http.Handler, string) {
 		t.Fatal(err)
 	}
 	web := fstest.MapFS{"index.html": {Data: []byte("<title>hunsu</title>")}}
-	return server.New(p, svc, web, 10*time.Millisecond), dir
+	hub := ui.NewHub()
+	return server.New(p, svc, hub, web, 10*time.Millisecond), dir, hub
 }
 
 func TestServer_API(t *testing.T) {
@@ -63,7 +65,7 @@ func TestServer_API(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, _ := newServer(t)
+			h, _, _ := newServer(t)
 			rec := httptest.NewRecorder()
 			h.ServeHTTP(rec, httptest.NewRequest(tt.method, tt.target, strings.NewReader(tt.body)))
 			key, value, _ := strings.Cut(tt.wantHeader, ": ")
@@ -85,7 +87,7 @@ func TestServer_Events(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			h, dir := newServer(t)
+			h, dir, _ := newServer(t)
 			srv := httptest.NewServer(h)
 			defer srv.Close()
 			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
@@ -101,6 +103,62 @@ func TestServer_Events(t *testing.T) {
 			}
 			if got := firstData(res.Body); got != tt.want {
 				t.Errorf("첫 이벤트 = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestServer_UIState(t *testing.T) {
+	tests := []struct {
+		name       string
+		origin     string
+		wantStatus int
+		wantPage   string
+	}{
+		{"hunsu 화면이 알린 화면 상태를 기억한다", "http://example.com", 204, "a.html"},
+		{"다른 웹사이트가 보낸 화면 상태는 거부한다", "http://evil.test", 403, ""},
+		{"출처가 없는 요청도 거부한다", "", 403, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, _, hub := newServer(t)
+			req := httptest.NewRequest("POST", "/api/ui", strings.NewReader(`{"page":"a.html"}`))
+			if tt.origin != "" {
+				req.Header.Set("Origin", tt.origin)
+			}
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tt.wantStatus || hub.Current().Page != tt.wantPage {
+				t.Errorf("상태 = %d, 기억한 페이지 = %q; want %d, %q", rec.Code, hub.Current().Page, tt.wantStatus, tt.wantPage)
+			}
+		})
+	}
+}
+
+func TestServer_UICommands(t *testing.T) {
+	tests := []struct {
+		name    string
+		command ui.Command
+		want    string
+	}{
+		{"서버의 명령을 브라우저로 보낸다", ui.Command{Kind: ui.Open, Page: "a.html"}, `data: {"kind":"open","page":"a.html"}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, _, hub := newServer(t)
+			srv := httptest.NewServer(h)
+			defer srv.Close()
+			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
+			defer cancel()
+			req, _ := http.NewRequestWithContext(ctx, "GET", srv.URL+"/api/ui/commands", nil)
+			res, err := http.DefaultClient.Do(req)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer res.Body.Close()
+			hub.Send(tt.command)
+			if got := firstData(res.Body); got != tt.want {
+				t.Errorf("첫 명령 = %q, want %q", got, tt.want)
 			}
 		})
 	}

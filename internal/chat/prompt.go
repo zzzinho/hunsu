@@ -40,12 +40,15 @@ func truncate(s string, limit int) string {
 func systemPrompt(files map[string][]byte) string {
 	var b strings.Builder
 	b.WriteString(instructions)
+	b.WriteString(project.Rules)
+	found := false
 	for _, name := range project.DesignSystemFiles() {
 		if data, ok := files[name]; ok {
+			found = true
 			fmt.Fprintf(&b, "\n<%s>\n%s\n</%s>\n", name, data, name)
 		}
 	}
-	if b.Len() == len(instructions) {
+	if !found {
 		b.WriteString("\n아직 디자인 시스템이 없다.")
 	}
 	return b.String()
