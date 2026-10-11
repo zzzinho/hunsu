@@ -16,10 +16,12 @@ const (
 )
 
 type Event struct {
-	Kind      string `json:"kind"`
-	File      string `json:"file,omitempty"`
-	Size      int    `json:"size,omitempty"`
-	Text      string `json:"text,omitempty"`
+	Kind string `json:"kind"`
+	File string `json:"file,omitempty"`
+	Size int    `json:"size,omitempty"`
+	Text string `json:"text,omitempty"`
+	// Variant 는 비교안을 만들 때 몇 번째 안의 이벤트인지다. 0 이면 비교안이 아니다.
+	Variant   int    `json:"variant,omitempty"`
 	SessionID string `json:"-"`
 }
 

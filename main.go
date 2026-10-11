@@ -68,11 +68,11 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 	if renderer != nil {
 		tools = &llm.MCPServer{Name: "hunsu", URL: url + "mcp/render", Token: token}
 	}
-	llmProvider, err := provider(providerName, tools)
+	llmProvider, err := provider(providerName)
 	if err != nil {
 		return err
 	}
-	assistant, err := chat.New(p, llmProvider, thumbnailer(renderer))
+	assistant, err := chat.New(p, llmProvider, chat.Options{Thumbnail: thumbnailer(renderer), Tools: tools})
 	if err != nil {
 		return err
 	}
@@ -100,21 +100,21 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 // 브라우저 채팅을 처리할 LLM 을 고르는 유일한 곳이다. 다른 LLM 은 llm.Provider 를 구현한 뒤 여기에 더한다.
 var providers = []struct {
 	name string
-	make func(path string, tools *llm.MCPServer) llm.Provider
+	make func(path string) llm.Provider
 }{
-	{"claude", func(path string, tools *llm.MCPServer) llm.Provider { return claude.CLI{Path: path, Tools: tools} }},
-	{"codex", func(path string, tools *llm.MCPServer) llm.Provider { return codex.CLI{Path: path, Tools: tools} }},
+	{"claude", func(path string) llm.Provider { return claude.CLI{Path: path} }},
+	{"codex", func(path string) llm.Provider { return codex.CLI{Path: path} }},
 }
 
 // name 이 비면 설치된 CLI 를 순서대로 찾는다. 아무것도 없으면 첫 provider 로 켜고, 요청할 때 실행 실패를 알린다.
-func provider(name string, tools *llm.MCPServer) (llm.Provider, error) {
+func provider(name string) (llm.Provider, error) {
 	for _, p := range providers {
 		if name != "" && name != p.name {
 			continue
 		}
 		path, err := exec.LookPath(p.name)
 		if err == nil {
-			return p.make(path, tools), nil
+			return p.make(path), nil
 		}
 		if name != "" {
 			return nil, fmt.Errorf("%s 를 찾지 못했다. 설치하고 로그인했는지 확인한다", name)
@@ -124,7 +124,7 @@ func provider(name string, tools *llm.MCPServer) (llm.Provider, error) {
 		return nil, fmt.Errorf("모르는 provider: %s (claude, codex 중 하나)", name)
 	}
 	fmt.Println("claude 나 codex 를 찾지 못했다. 둘 중 하나를 설치하고 로그인해야 브라우저 채팅을 쓸 수 있다")
-	return providers[0].make(providers[0].name, tools), nil
+	return providers[0].make(providers[0].name), nil
 }
 
 // 버전 썸네일은 첫 화면만 찍는다. Chrome 이 없으면 썸네일 없이 버전을 남긴다.

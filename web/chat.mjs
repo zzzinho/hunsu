@@ -30,3 +30,8 @@ export function elapsedText(ms) {
   const seconds = Math.floor(ms / 1000);
   return seconds < 60 ? `${seconds}초` : `${Math.floor(seconds / 60)}분 ${seconds % 60}초`;
 }
+
+export const variantsText = (steps) => Object.keys(steps)
+  .sort((a, b) => a - b)
+  .map((id) => `안 ${id} · ${steps[id]}`)
+  .join(' / ');

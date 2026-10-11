@@ -1,7 +1,7 @@
 import { modeOf, openFile, pageFileName, reactionTo, watchList } from './view.mjs';
 import { DEFAULT_SIZES, keyDelta, resize, togglePanel } from './layout.mjs';
 import { frameBox, zoomBy, zoomForKey, zoomStep, zoomText } from './zoom.mjs';
-import { elapsedText, parseSSE, stepText } from './chat.mjs';
+import { elapsedText, parseSSE, stepText, variantsText } from './chat.mjs';
 import { createFrameTools } from './frame.mjs';
 import { toolForKey } from './tools.mjs';
 import { replaceText } from './textedit.mjs';
@@ -325,6 +325,7 @@ function setRunning(controller) {
   const busy = Boolean(controller);
   editor.setOption('readOnly', busy);
   promptInput.disabled = busy;
+  promptForm.elements.variants.disabled = busy;
   $('#undo').disabled = busy;
   $('#new-chat').disabled = busy;
   $('#send').textContent = busy ? '취소' : '보내기';
@@ -342,21 +343,30 @@ async function* streamEvents(res) {
 
 async function sendPrompt(prompt) {
   if (!editor.isClean()) await save();
+  const count = Number(promptForm.elements.variants.value);
   setRunning(new AbortController());
-  addMessage('user', prompt);
+  addMessage('user', count > 1 ? `${prompt} (${count}안 비교)` : prompt);
   const progress = addProgress();
+  const steps = {};
   let created = null;
+  let ended = false;
   try {
-    const res = await request('/api/chat', {
+    const res = await request(count > 1 ? '/api/chat/variants' : '/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, page: state.preview ?? '', model: promptForm.elements.model.value, selection }),
+      body: JSON.stringify({ prompt, page: state.preview ?? '', model: promptForm.elements.model.value, selection, count }),
       signal: running.signal,
     });
     for await (const event of streamEvents(res)) {
-      if (event.kind === 'reply') addMessage('assistant', event.text);
+      if (event.variant) {
+        steps[event.variant] = stepText(event) ?? steps[event.variant];
+        progress.show(variantsText(steps));
+      } else if (event.kind === 'reply') addMessage('assistant', event.text);
       else if (event.kind === 'created') created ??= event.file;
-      else progress.show(stepText(event));
+      else {
+        progress.show(stepText(event));
+        ended ||= event.kind === 'end';
+      }
     }
     progress.finish();
   } catch (error) {
@@ -366,6 +376,74 @@ async function sendPrompt(prompt) {
     if (created) await open(created);
     else await openExisting();
   }
+  if (count > 1 && ended) {
+    const item = addMessage('progress', `비교안 ${count}개를 만들었습니다`);
+    const reopen = document.createElement('button');
+    reopen.type = 'button';
+    reopen.textContent = '비교안 보기';
+    reopen.onclick = () => showVariants();
+    item.append(reopen);
+    await showVariants();
+  }
+}
+
+function variantColumn(variant) {
+  const item = document.createElement('li');
+  const title = document.createElement('strong');
+  title.textContent = `안 ${variant.id}`;
+  const reply = document.createElement('p');
+  reply.className = variant.error ? 'reply error' : 'reply';
+  reply.textContent = variant.error || variant.reply;
+  item.append(title, reply);
+  if (!variant.error) {
+    const shot = document.createElement('div');
+    shot.className = 'shot';
+    const preview = document.createElement('iframe');
+    preview.title = `안 ${variant.id} 미리보기`;
+    preview.src = `/variant/${variant.id}/${encodeURIComponent(variant.page)}`;
+    shot.append(preview);
+    item.append(shot);
+  }
+  const choose = document.createElement('button');
+  choose.type = 'button';
+  choose.className = 'primary';
+  choose.textContent = '이 안 고르기';
+  choose.disabled = Boolean(variant.error);
+  choose.onclick = () => noteVariantErrors(chooseVariant(variant));
+  item.append(choose);
+  return item;
+}
+
+const noteVariantErrors = (promise) => promise.catch((error) => { $('#variant-note').textContent = error.message; });
+
+// 미리보기는 보고 있는 너비로 렌더하고, 칸 너비에 맞게 줄여 보인다.
+function fitVariantFrames() {
+  const width = deviceWidth ?? 1280;
+  $$('#variant-list iframe').forEach((preview) => {
+    const shot = preview.parentElement;
+    const zoom = shot.clientWidth / width;
+    Object.assign(preview.style, { width: `${width}px`, height: `${shot.clientHeight / zoom}px`, zoom });
+  });
+}
+
+async function showVariants() {
+  const variants = await (await request('/api/variants')).json();
+  if (!variants.length) {
+    status.textContent = '고를 비교안이 없습니다';
+    return;
+  }
+  $('#variant-note').textContent = '';
+  $('#variant-list').replaceChildren(...variants.map(variantColumn));
+  $('#variants-dialog').showModal();
+  fitVariantFrames();
+}
+
+async function chooseVariant(variant) {
+  if (!editor.isClean()) await save();
+  await request(`/api/variants/choose?id=${variant.id}&page=${encodeURIComponent(state.preview ?? '')}`, { method: 'POST' });
+  $('#variants-dialog').close();
+  addMessage('progress', `안 ${variant.id} 을 골랐습니다. 나머지 안은 버전에 남았습니다`);
+  await open(variant.page);
 }
 
 function showSelection(next, picked) {
@@ -509,6 +587,12 @@ $$('[data-export]').forEach((button) => {
 document.addEventListener('click', (event) => {
   if (!event.target.closest('#export')) $('#export').open = false;
 });
+$('#variants-close').onclick = () => $('#variants-dialog').close();
+$('#variants-discard').onclick = () => noteVariantErrors((async () => {
+  await request('/api/variants/discard', { method: 'POST' });
+  $('#variants-dialog').close();
+  addMessage('progress', '비교안을 버렸습니다');
+})());
 $('#versions-open').onclick = async () => {
   await showVersions();
   $('#versions').showModal();

@@ -30,6 +30,9 @@ var errorStatus = []struct {
 	{chat.ErrBusy, http.StatusConflict},
 	{history.ErrNothingToUndo, http.StatusConflict},
 	{history.ErrNoVersion, http.StatusNotFound},
+	{history.ErrNoVariant, http.StatusNotFound},
+	{chat.ErrVariantCount, http.StatusBadRequest},
+	{chat.ErrNoVariants, http.StatusConflict},
 }
 
 func (s *Server) list(w http.ResponseWriter, r *http.Request) {

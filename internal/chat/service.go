@@ -47,17 +47,30 @@ type Service struct {
 	llm      llm.Provider
 	history  *history.History
 	timeline *history.Timeline
+	variants *history.Variants
+	pending  *variantRun
 	session  session
 	seen     map[string][32]byte
+	tools    *llm.MCPServer
 }
 
-// thumb 가 nil 이면 버전에 썸네일을 남기지 않는다.
-func New(p *project.Project, provider llm.Provider, thumb history.Thumbnailer) (*Service, error) {
+type Options struct {
+	// Thumbnail 이 nil 이면 버전에 썸네일을 남기지 않는다.
+	Thumbnail history.Thumbnailer
+	// Tools 는 요청마다 LLM 에게 건넬 hunsu 도구 서버다. nil 이면 건네지 않는다.
+	Tools *llm.MCPServer
+}
+
+func New(p *project.Project, provider llm.Provider, opts Options) (*Service, error) {
 	h, err := history.New(p)
 	if err != nil {
 		return nil, err
 	}
-	timeline, err := history.NewTimeline(p, thumb)
+	timeline, err := history.NewTimeline(p, opts.Thumbnail)
+	if err != nil {
+		return nil, err
+	}
+	variants, err := history.NewVariants(p)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +78,7 @@ func New(p *project.Project, provider llm.Provider, thumb history.Thumbnailer) (
 	if err != nil {
 		return nil, err
 	}
-	return &Service{project: p, llm: provider, history: h, timeline: timeline, session: newSession(state, provider.Name())}, nil
+	return &Service{project: p, llm: provider, history: h, timeline: timeline, variants: variants, session: newSession(state, provider.Name()), tools: opts.Tools}, nil
 }
 
 func (s *Service) Models() []llm.Model { return s.llm.Models() }
@@ -93,10 +106,11 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	edited := s.editedSinceLastReply(current)
 	req := llm.Request{
 		Dir:          s.project.Dir(),
-		Prompt:       userPrompt(t, edited, designUpdate(current, edited, s.seen == nil), before.Assets),
+		Prompt:       userPrompt(promptInput{turn: t, edited: edited, design: designUpdate(current, edited, s.seen == nil), assets: before.Assets}),
 		SystemPrompt: systemPrompt(),
 		SessionID:    s.session.load(),
 		Model:        cmp.Or(t.Model, s.defaultModel()),
+		Tools:        s.tools,
 	}
 	var sessionID string
 	runErr := s.llm.Run(ctx, req, func(e llm.Event) {

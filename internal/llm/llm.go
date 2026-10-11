@@ -20,10 +20,11 @@ type Request struct {
 	// SessionID 는 provider 가 Started 이벤트로 알려준 대화 ID 다. 비어 있으면 새 대화를 시작한다.
 	SessionID string
 	Model     string
+	// Tools 는 LLM 이 쓸 수 있게 붙일 hunsu 도구 서버다. nil 이면 붙이지 않는다.
+	Tools *MCPServer
 }
 
-// MCPServer 는 hunsu 가 provider 에게 건네는 도구 서버(MCP Streamable HTTP, Bearer 토큰)다.
-// provider 는 생성할 때 받아 LLM 이 그 도구를 쓸 수 있게 붙인다.
+// MCPServer 는 hunsu 가 요청마다 provider 에게 건네는 도구 서버(MCP Streamable HTTP, Bearer 토큰)다.
 type MCPServer struct {
 	Name  string
 	URL   string

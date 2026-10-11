@@ -91,7 +91,7 @@ hunsu 는 특정 LLM·에이전트를 전제하지 않는다. `claude -p`, `code
 
 - `Run(ctx, Request, emit)`: `Request.Dir` 의 파일을 직접 고치고, 공통 이벤트(start·think·read·write·answer·tool·retry·reply·fail)로 진행을 알린다. 대화 ID 는 `Started` 의 `SessionID` 로 알리고 다음 `Request.SessionID` 로 받는다. ctx 취소 시 멈춘다.
 - `Models()`: 고를 수 있는 모델. 첫 번째가 기본. 비면 화면이 선택을 숨긴다.
-- 도구: hunsu 가 LLM 에게 주는 도구는 MCP 서버(`/mcp/render`, 화면 확인 도구만)로 건넨다. provider 는 생성할 때 `llm.MCPServer` 로 받아 붙이고, 쓰는 동안 `tool` 이벤트로 알린다. Chrome 이 없으면 건네지 않는다.
+- 도구: hunsu 가 LLM 에게 주는 도구는 MCP 서버(`/mcp/render`, 화면 확인 도구만)로 건넨다. provider 는 요청마다 `Request.Tools`(`llm.MCPServer`) 로 받아 붙이고, 쓰는 동안 `tool` 이벤트로 알린다. Chrome 이 없으면 건네지 않는다.
 - 프롬프트 조립, 동시 실행 막기, 스냅샷, 직접 고친 파일 알림은 `internal/chat` 이 맡는다.
 
 **추가 방법**
@@ -199,7 +199,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 - [x] 9. 내보내기: 폴더 ZIP(디자인 시스템·페이지·에셋, `.hunsu/` 제외), 페이지별 단일 HTML(`design.css` 링크를 `<style>` 로, 에셋 경로를 data URI 로), PNG(렌더러, 높이 16,000px 까지). 화면 막대의 [내보내기] 메뉴에서 받는다. Chrome 이 없으면 PNG 는 이유를 알린다
 - [x] 10. 버저닝: 버전은 디자인 파일 전체의 저장본(시각·이름·대표 페이지·썸네일). 요청이 끝나면 요청 내용을 이름으로, 요청 전에 사용자가 고친 내용이 있으면 '요청 전' 으로, [버전 저장] 으로 남긴다. 직전 버전과 내용이 같으면 남기지 않는다. 아무 버전으로 복원하고, 복원 전 상태와 복원 결과도 버전으로 남는다. [되돌리기] 는 지금처럼 요청·checkpoint·복원 직전으로 돌아간다. 썸네일은 대표 페이지(새로 만든 페이지 → 보고 있던 페이지 → 첫 페이지)를 1280×800 으로 찍고, Chrome 이 없으면 없다. 에셋은 넣지 않는다. 버전은 최근 100개, 되돌리기 스냅샷은 최근 50개만 남긴다. MCP `undo` 설명을 맞춘다
 - [x] 11. Codex provider: `codex exec --json`(이어가기는 `exec resume`). 지시문은 `developer_instructions`, 도구는 `mcp_servers.hunsu`(자동 승인), 샌드박스는 `workspace-write`, 사용자 config·rules·프로젝트 AGENTS.md 는 끈다. 모델은 gpt-5.6-sol(기본)·terra·luna. provider 는 실행 인자 `-provider claude|codex` 로 고르고, 생략하면 설치된 것을 claude → codex 순으로 찾는다. 대화 ID 는 provider 별 파일(`.hunsu/session-<이름>`)
-- [ ] 12. 비교안(옵션): 한 요청에 2~3안, 나란히 보기, 고른 안이 페이지가 되고 나머지는 버전에 남는다
+- [x] 12. 비교안(옵션): 입력창에서 [안 2개·3개] 를 고르면 디자인 파일을 안마다 `.hunsu/variants/<n>/` 에 복사하고 provider 를 병렬로 실행한다(새 대화, 안마다 '충실하게·과감하게·절제해서' 방향). 비교안 실행에는 도구를 주지 않는다(`screenshot` 은 원본 폴더를 찍는다). 그래서 도구는 provider 생성이 아니라 요청(`llm.Request.Tools`)으로 건넨다. 나란히 보고 고르면 그 안이 지금 상태가 되고, 나머지 안도 썸네일과 함께 버전에 남는다. [되돌리기] 로 고르기 전으로 돌아간다
 
 **v1 마무리** (기능 뒤)
 

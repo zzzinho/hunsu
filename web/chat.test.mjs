@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { elapsedText, parseSSE, stepText } from './chat.mjs';
+import { elapsedText, parseSSE, stepText, variantsText } from './chat.mjs';
 
 async function table(t, rows, check) {
   for (const [name, ...args] of rows) await t.test(name, () => check(...args));
@@ -29,6 +29,11 @@ test('stepText', (t) => table(t, [
   ['끝나면 완료로 보인다', { kind: 'end' }, '완료'],
   ['답변은 진행 표시가 아니라 대화에 보인다', { kind: 'reply', text: '고쳤습니다' }, null],
 ], (event, want) => assert.equal(stepText(event), want)));
+
+test('variantsText', (t) => table(t, [
+  ['안마다 마지막 진행을 안 번호순으로 보인다', { 2: 'a.html 쓰는 중', 1: '생각하는 중' }, '안 1 · 생각하는 중 / 안 2 · a.html 쓰는 중'],
+  ['아직 소식이 없는 안은 보이지 않는다', {}, ''],
+], (steps, want) => assert.equal(variantsText(steps), want)));
 
 test('elapsedText', (t) => table(t, [
   ['1분 미만은 초로 보인다', 42_300, '42초'],

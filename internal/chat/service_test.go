@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 	"testing"
 
 	"hunsu/internal/chat"
@@ -18,11 +20,15 @@ import (
 	"hunsu/internal/ui"
 )
 
+// writes·reply 의 {dir} 은 실행한 폴더 이름(비교안 번호)으로 바뀐다. failIn 폴더에서 실행하면 실패한다.
 type fakeProvider struct {
+	mu       sync.Mutex
 	name     string
 	requests []llm.Request
 	writes   map[string]string
+	reply    string
 	err      error
+	failIn   string
 	started  chan struct{}
 	release  chan struct{}
 }
@@ -34,18 +40,57 @@ func (f *fakeProvider) Models() []llm.Model {
 }
 
 func (f *fakeProvider) Run(_ context.Context, req llm.Request, emit func(llm.Event)) error {
+	f.mu.Lock()
 	f.requests = append(f.requests, req)
+	f.mu.Unlock()
 	emit(llm.Event{Kind: llm.Started, SessionID: "s1"})
 	if f.release != nil {
 		close(f.started)
 		<-f.release
 	}
+	dir := filepath.Base(req.Dir)
+	if dir == f.failIn {
+		return errors.New("안 " + dir + " 실패")
+	}
 	for name, body := range f.writes {
-		if err := os.WriteFile(filepath.Join(req.Dir, name), []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(req.Dir, name), []byte(strings.ReplaceAll(body, "{dir}", dir)), 0o644); err != nil {
 			return err
 		}
 	}
+	if f.reply != "" {
+		emit(llm.Event{Kind: llm.Replied, Text: strings.ReplaceAll(f.reply, "{dir}", dir)})
+	}
 	return f.err
+}
+
+// 비교안 요청은 동시에 실행되어 순서가 정해지지 않으므로 실행한 폴더 이름순으로 돌려준다.
+func (f *fixture) variantRequests(n int) []llm.Request {
+	requests := slices.Clone(f.runner.requests[len(f.runner.requests)-n:])
+	slices.SortFunc(requests, func(a, b llm.Request) int { return strings.Compare(a.Dir, b.Dir) })
+	return requests
+}
+
+func (f *fixture) sendVariants(turn chat.Turn, count int) string {
+	var mu sync.Mutex
+	var events []string
+	err := f.svc.SendVariants(context.Background(), turn, count, func(e llm.Event) {
+		mu.Lock()
+		defer mu.Unlock()
+		events = append(events, fmt.Sprintf("%d/%s", e.Variant, e))
+	})
+	if err != nil {
+		events = append(events, "error:"+err.Error())
+	}
+	slices.Sort(events)
+	return strings.Join(events, " ")
+}
+
+func (f *fixture) variants() string {
+	var out []string
+	for _, v := range f.svc.Variants() {
+		out = append(out, fmt.Sprintf("%d:%s:%s:%s", v.ID, v.Page, v.Reply, v.Error))
+	}
+	return strings.Join(out, " ")
 }
 
 type fixture struct {
@@ -63,7 +108,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 func (f *fixture) restart() {
-	svc, err := chat.New(f.project, f.runner, nil)
+	svc, err := chat.New(f.project, f.runner, chat.Options{Tools: hunsuTools})
 	f.must(err)
 	f.svc = svc
 }
@@ -76,6 +121,8 @@ func (f *fixture) send(turn chat.Turn) string {
 	}
 	return strings.Join(events, " ")
 }
+
+var hunsuTools = &llm.MCPServer{Name: "hunsu", URL: "http://127.0.0.1:7777/mcp/render", Token: "t"}
 
 func (f *fixture) lastRequest() llm.Request { return f.runner.requests[len(f.runner.requests)-1] }
 
@@ -235,6 +282,12 @@ func TestService(t *testing.T) {
 				return fmt.Sprint(f.runner.requests[0].SystemPrompt == f.lastRequest().SystemPrompt)
 			},
 			"true"},
+		{"hunsu 가 준비한 도구를 요청에 건넨다",
+			func(f *fixture) string {
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.lastRequest().Tools.URL
+			},
+			hunsuTools.URL},
 		{"고른 모델로 보낸다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "고쳐", Model: "slow"})
@@ -370,7 +423,87 @@ func TestService(t *testing.T) {
 				return fmt.Sprint(first, " ", second, " ", f.versions())
 			},
 			"true false 1:직접 저장:a.html"},
-		{"요청을 처리하는 동안 다른 요청, 되돌리기, 체크포인트, 버전 저장, 복원은 받지 않는다",
+		{"비교안은 안마다 디자인 파일 복사본에서 도구 없이 새 대화로 실행한다",
+			func(f *fixture) string {
+				f.send(chat.Turn{Prompt: "준비"})
+				f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2)
+				var out []string
+				for _, r := range f.variantRequests(2) {
+					out = append(out, fmt.Sprint(r.Dir == f.project.StatePath("variants", filepath.Base(r.Dir)), r.Tools == nil, r.SessionID == ""))
+				}
+				return strings.Join(out, " ")
+			},
+			"true true true true true true"},
+		{"안마다 다른 방향을 붙이고, 새 대화라 디자인 시스템 전체를 함께 보낸다",
+			func(f *fixture) string {
+				f.warmUp()
+				f.sendVariants(chat.Turn{Prompt: "둥글게"}, 3)
+				var out []string
+				for _, r := range f.variantRequests(3) {
+					line := r.Prompt[strings.Index(r.Prompt, "[비교안]"):strings.Index(r.Prompt, "[요청]")]
+					out = append(out, fmt.Sprint(strings.Contains(r.Prompt, designBlock), " ", strings.TrimSpace(line)))
+				}
+				return strings.Join(out, "\n")
+			},
+			"true [비교안] 3개 중 1번째 안. 요청을 가장 충실하게 따른다. 다른 안과 뚜렷이 달라야 한다.\n" +
+				"true [비교안] 3개 중 2번째 안. 같은 요청을 더 과감한 색·글꼴·배치로 푼다. 다른 안과 뚜렷이 달라야 한다.\n" +
+				"true [비교안] 3개 중 3번째 안. 같은 요청을 더 단순하고 절제된 방향으로 푼다. 다른 안과 뚜렷이 달라야 한다."},
+		{"비교안 진행 이벤트에 안 번호를 붙이고, 모두 끝나면 끝을 알린다",
+			func(f *fixture) string { return f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2) },
+			"0/end 1/start 2/start"},
+		{"비교안은 원본 디자인 파일을 바꾸지 않는다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "안 {dir}"}
+				f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2)
+				return f.read("a.html")
+			},
+			"a"},
+		{"안마다 대표 페이지와 답변, 실패 이유를 알려준다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"b.html": "안 {dir}"}
+				f.runner.reply = "안 {dir} 완성"
+				f.runner.failIn = "2"
+				f.sendVariants(chat.Turn{Page: "a.html", Prompt: "b 만들어"}, 2)
+				return f.variants()
+			},
+			"1:b.html:안 1 완성: 2:a.html::안 2 실패"},
+		{"안을 고르면 그 안이 지금 상태가 되고, 나머지 안도 버전에 남는다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "안 {dir}"}
+				f.sendVariants(chat.Turn{Page: "a.html", Prompt: "둥글게"}, 2)
+				f.must(f.svc.ChooseVariant(2, "a.html"))
+				return f.read("a.html") + " / " + f.versions() + " / [" + f.variants() + "]"
+			},
+			"안 2 / 3:안 2 선택 · 둥글게:a.html 2:안 1 · 둥글게:a.html 1:요청 전:a.html / []"},
+		{"안을 고른 뒤 되돌리면 고르기 전으로 돌아간다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "안 {dir}"}
+				f.sendVariants(chat.Turn{Page: "a.html", Prompt: "둥글게"}, 2)
+				f.must(f.svc.ChooseVariant(1, "a.html"))
+				f.must(f.svc.Undo())
+				return f.read("a.html")
+			},
+			"a"},
+		{"실패한 안은 고를 수 없다",
+			func(f *fixture) string {
+				f.runner.failIn = "2"
+				f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2)
+				return fmt.Sprint(errors.Is(f.svc.ChooseVariant(2, ""), history.ErrNoVariant))
+			},
+			"true"},
+		{"비교안을 버리면 고를 것이 없다",
+			func(f *fixture) string {
+				f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2)
+				f.must(f.svc.DiscardVariants())
+				return fmt.Sprint(errors.Is(f.svc.ChooseVariant(1, ""), chat.ErrNoVariants), " [", f.variants(), "]")
+			},
+			"true []"},
+		{"비교안은 2개나 3개만 만든다",
+			func(f *fixture) string {
+				return f.sendVariants(chat.Turn{Prompt: "둥글게"}, 1) + " / " + f.sendVariants(chat.Turn{Prompt: "둥글게"}, 4)
+			},
+			"error:" + chat.ErrVariantCount.Error() + " / error:" + chat.ErrVariantCount.Error()},
+		{"요청을 처리하는 동안 다른 요청, 되돌리기, 체크포인트, 버전 저장, 복원, 비교안 만들기·고르기·버리기는 받지 않는다",
 			func(f *fixture) string {
 				f.runner.started, f.runner.release = make(chan struct{}), make(chan struct{})
 				done := make(chan string)
@@ -378,12 +511,14 @@ func TestService(t *testing.T) {
 				<-f.runner.started
 				_, saveErr := f.svc.SaveVersion("a.html")
 				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(llm.Event) {}), " / ", f.svc.Undo(), " / ", f.svc.Checkpoint(),
-					" / ", saveErr, " / ", f.svc.Restore(1, "a.html"))
+					" / ", saveErr, " / ", f.svc.Restore(1, "a.html"),
+					" / ", f.svc.SendVariants(context.Background(), chat.Turn{Prompt: "3"}, 2, func(llm.Event) {}),
+					" / ", f.svc.ChooseVariant(1, ""), " / ", f.svc.DiscardVariants())
 				close(f.runner.release)
 				<-done
 				return got
 			},
-			strings.Repeat(chat.ErrBusy.Error()+" / ", 4) + chat.ErrBusy.Error()},
+			strings.Repeat(chat.ErrBusy.Error()+" / ", 7) + chat.ErrBusy.Error()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

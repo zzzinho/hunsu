@@ -13,8 +13,7 @@ import (
 )
 
 type CLI struct {
-	Path  string
-	Tools *llm.MCPServer
+	Path string
 }
 
 // 첫 번째가 기본이다. 사용자의 claude 기본 모델 설정과 관계없이 디자인 품질이 가장 좋은 opus 를 쓴다.
@@ -26,7 +25,7 @@ func (CLI) Models() []llm.Model { return slices.Clone(models) }
 
 func (c CLI) Run(ctx context.Context, req llm.Request, emit func(llm.Event)) error {
 	var stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, c.Path, Args(req, c.Tools)...)
+	cmd := exec.CommandContext(ctx, c.Path, Args(req)...)
 	cmd.Dir = req.Dir
 	cmd.Stdin = strings.NewReader(req.Prompt)
 	var decoder Decoder
