@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"regexp"
+	"strings"
 
 	"hunsu/internal/llm"
 )
@@ -79,6 +80,9 @@ func (d *Decoder) streamEvent(line streamLine) []llm.Event {
 	e := line.Event
 	switch e.Type {
 	case "content_block_start":
+		if parts := strings.SplitN(e.ContentBlock.Name, "__", 3); len(parts) == 3 && parts[0] == "mcp" && e.ContentBlock.Type == "tool_use" {
+			return []llm.Event{{Kind: llm.UsingTool, Text: parts[2]}}
+		}
 		if kind, ok := toolKinds[e.ContentBlock.Name]; ok && e.ContentBlock.Type == "tool_use" {
 			d.tool = &toolInput{kind: kind}
 			return []llm.Event{{Kind: kind}}

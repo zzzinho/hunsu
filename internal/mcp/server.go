@@ -24,7 +24,13 @@ type Tool struct {
 	Name        string
 	Description string
 	InputSchema map[string]any
-	Call        func(ctx context.Context, args json.RawMessage) (string, error)
+	Call        func(ctx context.Context, args json.RawMessage) (Result, error)
+}
+
+// Result 는 도구 호출 결과다. Image 는 PNG 다.
+type Result struct {
+	Text  string
+	Image []byte
 }
 
 type Server struct {
@@ -71,8 +77,21 @@ type toolDescriptor struct {
 }
 
 type content struct {
-	Type string `json:"type"`
-	Text string `json:"text"`
+	Type     string `json:"type"`
+	Text     string `json:"text,omitempty"`
+	Data     []byte `json:"data,omitempty"`
+	MimeType string `json:"mimeType,omitempty"`
+}
+
+func (r Result) content() []content {
+	var out []content
+	if r.Image != nil {
+		out = append(out, content{Type: "image", Data: r.Image, MimeType: "image/png"})
+	}
+	if r.Text != "" || r.Image == nil {
+		out = append(out, content{Type: "text", Text: r.Text})
+	}
+	return out
 }
 
 type callResult struct {
@@ -146,11 +165,11 @@ func (s *Server) call(ctx context.Context, params json.RawMessage) (any, *rpcErr
 		if len(p.Arguments) == 0 {
 			p.Arguments = json.RawMessage("{}")
 		}
-		text, err := t.Call(ctx, p.Arguments)
+		result, err := t.Call(ctx, p.Arguments)
 		if err != nil {
-			return callResult{Content: []content{{"text", err.Error()}}, IsError: true}, nil
+			return callResult{Content: Result{Text: err.Error()}.content(), IsError: true}, nil
 		}
-		return callResult{Content: []content{{"text", text}}}, nil
+		return callResult{Content: result.content()}, nil
 	}
 	return nil, &rpcError{codeInvalidParams, "없는 도구: " + p.Name}
 }

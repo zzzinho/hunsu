@@ -87,8 +87,9 @@ hunsu 는 특정 LLM·에이전트를 전제하지 않는다. `claude -p` 는 Po
 
 **계약** (`internal/llm`)
 
-- `Run(ctx, Request, emit)`: `Request.Dir` 의 파일을 직접 고치고, 공통 이벤트(start·think·read·write·answer·retry·reply·fail)로 진행을 알린다. 대화 ID 는 `Started` 의 `SessionID` 로 알리고 다음 `Request.SessionID` 로 받는다. ctx 취소 시 멈춘다.
+- `Run(ctx, Request, emit)`: `Request.Dir` 의 파일을 직접 고치고, 공통 이벤트(start·think·read·write·answer·tool·retry·reply·fail)로 진행을 알린다. 대화 ID 는 `Started` 의 `SessionID` 로 알리고 다음 `Request.SessionID` 로 받는다. ctx 취소 시 멈춘다.
 - `Models()`: 고를 수 있는 모델. 첫 번째가 기본. 비면 화면이 선택을 숨긴다.
+- 도구: hunsu 가 LLM 에게 주는 도구는 MCP 서버(`/mcp/render`, 화면 확인 도구만)로 건넨다. provider 는 생성할 때 `llm.MCPServer` 로 받아 붙이고, 쓰는 동안 `tool` 이벤트로 알린다. Chrome 이 없으면 건네지 않는다.
 - 프롬프트 조립, 동시 실행 막기, 스냅샷, 직접 고친 파일 알림은 `internal/chat` 이 맡는다.
 
 **추가 방법**
@@ -149,7 +150,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 | 항목 | 결정 | 이유 |
 |---|---|---|
-| 도구 | `get_context`, `checkpoint`, `undo`, `open_page` | 브라우저 상태와 되돌리기 연결만 hunsu 의 일 |
+| 도구 | `get_context`, `checkpoint`, `undo`, `open_page`, `screenshot`(Chrome 이 있을 때) | 브라우저 상태, 되돌리기, 렌더 결과만 hunsu 의 일 |
 | 전송 | 기존 HTTP 서버의 `/mcp` (Streamable HTTP, 응답 하나) | 브라우저 상태를 같은 프로세스에서 공유. stdio 는 별도 프로세스 |
 | 구현 | 표준 라이브러리 JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`) | 도구 호출만 필요 |
 | 포트·인증 | 7777 고정, `Bearer` 토큰(사용자 설정 폴더, 0600, 재사용) | 등록한 주소·헤더가 바뀌지 않게. `-port` 로 바꾸면 다시 등록해야 한다 |
@@ -157,7 +158,9 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | 브라우저 명령 | `GET /api/ui/commands` (SSE) | `open_page` |
 | 안내문 | 디자인 규칙은 브라우저 채팅과 공유. 클라이언트 도구 이름을 쓰지 않는다 | 클라이언트 중립 |
 
-**남은 것**: `screenshot` 도구(headless Chrome 필요), `open_page` 없이 만든 페이지의 목록 갱신.
+**렌더러**: 설치된 Chrome 계열 브라우저를 `--remote-debugging-pipe` 로 띄워 DevTools 프로토콜로 찍는다(WebSocket 불필요). 요청마다 새 프로세스, 너비 320~2560px(기본 1280), 위에서 최대 4000px, 30초 제한. 결과는 MCP 이미지로 돌려준다.
+
+**남은 것**: `open_page` 없이 만든 페이지의 목록 갱신.
 
 ## 8. 화면
 
@@ -190,7 +193,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 - [x] 6. 에셋: `assets/`(유일한 하위 폴더)에 이미지(png·jpg·gif·webp·avif·svg)·폰트(woff·woff2·ttf·otf)를 끌어다 놓거나 골라서 올린다. 파일당 10MB, 같은 이름은 거부. 목록을 요청마다 프롬프트 끝과 `get_context` 에. LLM 은 에셋을 참조만 하고 만들지 않으므로 되돌리기 스냅샷에 넣지 않는다. 지우기는 Finder 에서
 - [x] 7. 텍스트 직접 수정: 선택 도구로 텍스트만 가진 요소를 더블클릭해 고치고, Enter·바깥 클릭으로 반영, Esc 로 취소. 원본에서 같은 문구 중 몇 번째인지로 위치를 찾고, 찾지 못하면(페이지 JS 가 만든 문구 등) 반영하지 않고 알린다. 기존 파일 저장 API 를 쓴다. 편집기 저장처럼 되돌리기 스냅샷은 없다
-- [ ] 8. 렌더러: headless Chrome 스크린샷. `screenshot` MCP 도구를 내장 provider 와 외부 에이전트가 함께 쓴다. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 기능을 끈다
+- [x] 8. 렌더러: headless Chrome 스크린샷. `screenshot` MCP 도구를 내장 provider 와 외부 에이전트가 함께 쓴다. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 기능을 끈다
 - [ ] 9. 내보내기: 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용)
 - [ ] 10. 버저닝: 요청마다 자동 + [버전 저장]. 시각·요청·썸네일 타임라인, 아무 버전으로 복원(복원도 새 버전). 되돌리기는 이전 버전으로. MCP `undo` 는 지금 브라우저 요청 스냅샷도 함께 되돌리므로 설명을 맞춘다
 - [ ] 11. Codex provider: `codex exec --json`. provider 선택, provider 별 대화 ID
@@ -241,5 +244,15 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | 요청 메시지 끝 (현재) | 10,861 | 1,353 |
 
 캐시 저장 1.25배, 재사용 0.1배 단가 기준 약 4배 차이. 대화가 길수록 커진다. 바뀐 값도 정확히 반영한다.
+
+**렌더러** (2026-10-12, claude 2.1.296)
+
+| 질문 | 결과 |
+|---|---|
+| Chrome 시작부터 전체 페이지 PNG 까지 | 0.5~0.9초 |
+| `--safe-mode` 에서 `--mcp-config` 가 되나 | 안 된다. 넘긴 서버까지 꺼진다(`mcp_servers: []`) |
+| `--safe-mode` 없이 `--restricted --strict-mcp-config` 로 격리되나 | 된다. 사용자·부모 폴더 CLAUDE.md, 설정, 사용자 플러그인이 섞이지 않는다. 입력 4,476 토큰(safe-mode 4,520) |
+| 도구 설명의 비용 | `screenshot` 하나 +254 토큰, `/mcp` 전체(도구 4개·안내문) +1,750 토큰 |
+| LLM 이 스스로 확인하나 | haiku 가 "모바일에서 확인하고 고쳐" 에 `screenshot` 을 불렀다. 10초 |
 
 **MCP** (클라이언트: Claude Code, haiku): 선택 요소 색 변경 + 새 페이지 + 열기 14.7초. 도구 순서 `get_context` → `checkpoint` → 편집 → `open_page`. 브라우저 [되돌리기] 한 번으로 모두 복원. 토큰 없는 `/mcp` 401, 다른 출처 `/api/ui` 403.
