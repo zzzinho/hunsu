@@ -2,9 +2,11 @@ package llm
 
 import "context"
 
-// Provider 는 브라우저 채팅의 요청을 처리하는 LLM 이다. PoC 는 Claude Code CLI(claude -p) 를 쓰고,
-// Anthropic API·Codex 같은 다른 LLM 은 이 인터페이스를 구현해 main 에서 바꿔 끼운다.
+// Provider 는 브라우저 채팅의 요청을 처리하는 LLM 이다. Claude Code CLI·Codex CLI 가 구현하고,
+// Anthropic API 같은 다른 LLM 도 이 인터페이스를 구현해 main 에 더한다.
 type Provider interface {
+	// Name 은 provider 를 구별하는 이름이다. 대화 ID 를 provider 별로 저장하는 데 쓴다.
+	Name() string
 	// Run 은 req.Dir 의 디자인 파일을 직접 고치고, 진행 상황을 emit 으로 알린다.
 	Run(ctx context.Context, req Request, emit func(Event)) error
 	// Models 는 사용자가 고를 수 있는 모델이다. 첫 번째가 기본이다.

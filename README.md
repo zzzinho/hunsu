@@ -17,7 +17,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 렌더 화면을 보며 원본
 ## 요구 사항
 
 - macOS
-- [Claude Code](https://claude.com/claude-code) CLI (`claude`), 로그인 상태: 브라우저 채팅의 LLM provider (PoC)
+- 브라우저 채팅의 LLM: [Claude Code](https://claude.com/claude-code) CLI(`claude`) 또는 [Codex](https://github.com/openai/codex) CLI(`codex`), 로그인 상태
 - Chrome (선택): LLM 이 렌더 결과를 보고 확인한다. Chromium·Edge·Brave 도 된다. 없으면 이 기능만 꺼진다
 - Go 1.27+: 빌드할 때만
 
@@ -28,7 +28,7 @@ go build -o hunsu .
 ./hunsu ~/designs      # 생략하면 현재 디렉터리
 ```
 
-`http://127.0.0.1:7777` 에 뜨고 브라우저가 열린다. `-port 8888` 로 포트 변경, `-no-open` 으로 브라우저 열기 생략.
+`http://127.0.0.1:7777` 에 뜨고 브라우저가 열린다. `-port 8888` 로 포트 변경, `-no-open` 으로 브라우저 열기 생략. `-provider codex` 로 LLM 을 고른다(생략하면 설치된 것을 claude → codex 순으로).
 
 ## 사용법
 
@@ -131,11 +131,16 @@ designs/
 
 ## LLM provider
 
-브라우저 채팅의 LLM 은 `llm.Provider` 인터페이스 뒤에 있다. provider 는 `main.go` 에서만 고르고, API·Codex 등은 이 인터페이스를 구현해 추가한다 ([`PLAN.md`](PLAN.md) 5).
+브라우저 채팅의 LLM 은 `llm.Provider` 인터페이스 뒤에 있다. provider 는 `main.go` 에서만 고르고, Anthropic API 등은 이 인터페이스를 구현해 추가한다 ([`PLAN.md`](PLAN.md) 5).
 
 Chrome 이 있으면 provider 에게 `screenshot` 도구만 둔 MCP 서버(`/mcp/render`)를 건넨다. LLM 은 새 페이지를 만들었거나 크게 바꾼 뒤 스스로 렌더 결과를 보고 고친다.
 
-현재 provider 는 Claude Code CLI 다. 요청마다 디자인 폴더에서 `claude -p` 를 실행한다. 사용자 설정·hook·MCP 를 섞지 않고, 명령 실행 없이 폴더 안 파일만 다룬다. 작은 수정은 haiku 로 1센트 미만, opus 로 새 페이지는 약 $0.3 ([`PLAN.md`](PLAN.md) 11).
+| provider | 실행 | 격리 | 모델 |
+|---|---|---|---|
+| claude | 요청마다 `claude -p` | 사용자 설정·hook·MCP 를 섞지 않고, 명령 실행 없이 폴더 안 파일만 다룬다 | opus(기본)·sonnet·haiku. 작은 수정은 haiku 로 1센트 미만 |
+| codex | 요청마다 `codex exec` | 사용자 config·규칙·프로젝트 AGENTS.md 를 섞지 않고, 쓰기는 폴더로 한정된 샌드박스에서 명령을 실행한다. 전역 `~/.codex/AGENTS.md` 는 들어간다 | gpt-5.6-sol(기본)·terra·luna. 작은 수정은 luna 로 약 14초 |
+
+측정값은 [`PLAN.md`](PLAN.md) 11.
 
 ## 개발
 
@@ -149,7 +154,7 @@ go test ./... && node --test web/
 | `internal/project` | 디자인 폴더 접근, 폴더 밖 차단, 에셋, 템플릿, 디자인 규칙 |
 | `internal/watch` | 파일 변경 감지 |
 | `internal/llm` | provider 계약 |
-| `internal/claude` | PoC provider (`claude -p`) |
+| `internal/claude`, `internal/codex` | provider (`claude -p`, `codex exec`) |
 | `internal/history` | 스냅샷과 되돌리기 |
 | `internal/render` | headless Chrome 스크린샷 |
 | `internal/export` | ZIP, 단일 HTML 내보내기 |
@@ -164,7 +169,6 @@ go test ./... && node --test web/
 ## 한계
 
 - 브라우저용 API 의 localhost 보호가 일부만 적용됐다 (`/mcp` 토큰, `/api/ui` 출처 검사). 나머지는 v1 마무리 단계.
-- provider 는 Claude Code CLI 하나뿐이다.
 - 에이전트가 `open_page` 없이 만든 페이지는 다음 조작 때 목록에 나타난다.
 - macOS 만 확인했다. 루트의 `.html` 만 페이지로 다룬다.
 - 페이지 JS 가 실행 중에 붙인 클래스·id 가 선택 경로에 들어가면 LLM 수정이 적용되지 않을 수 있다.

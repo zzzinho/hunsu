@@ -1,6 +1,7 @@
 package chat_test
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
@@ -18,12 +19,15 @@ import (
 )
 
 type fakeProvider struct {
+	name     string
 	requests []llm.Request
 	writes   map[string]string
 	err      error
 	started  chan struct{}
 	release  chan struct{}
 }
+
+func (f *fakeProvider) Name() string { return cmp.Or(f.name, "fake") }
 
 func (f *fakeProvider) Models() []llm.Model {
 	return []llm.Model{{ID: "fast", Label: "빠름"}, {ID: "slow", Label: "느림"}}
@@ -258,6 +262,15 @@ func TestService(t *testing.T) {
 				return f.lastRequest().SessionID
 			},
 			"s1"},
+		{"provider 가 바뀌면 다른 provider 의 대화를 잇지 않는다",
+			func(f *fixture) string {
+				f.send(chat.Turn{Prompt: "1"})
+				f.runner.name = "other"
+				f.restart()
+				f.send(chat.Turn{Prompt: "2"})
+				return f.lastRequest().SessionID
+			},
+			""},
 		{"새 대화를 시작하면 세션을 잇지 않는다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "1"})

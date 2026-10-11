@@ -35,7 +35,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 원본을 직접 고치거나 
 | 프론트엔드 | 빌드 없는 vanilla JS + CodeMirror 5 | 바이너리에 그대로 포함. CodeMirror 6 은 번들러 필요 |
 | 페이지 | 루트 폴더의 `.html` 만. 숨김 파일·심볼릭 링크 제외 | 모든 페이지가 `design.css` 를 같은 경로로 링크 |
 | 디자인 시스템 | `DESIGN.md`(글 규칙) + `design.css`(CSS 변수·공통 클래스) | 브라우저가 그대로 적용. 변환 단계 불필요 |
-| LLM provider | `llm.Provider` 뒤에 둔다. PoC 는 `claude -p`. 고르는 곳은 `main.go` 하나 | API·Codex 등으로 교체·추가 (5) |
+| LLM provider | `llm.Provider` 뒤에 둔다. `claude -p`, `codex exec`. 고르는 곳은 `main.go` 하나 | API 등으로 추가 (5) |
 | LLM 편집 범위 | 일부 수정, 페이지 재디자인, 새 페이지, 여러 페이지, 빈 프로젝트 전체 생성 | 일부 수정만으로는 디자인 도구가 안 된다 |
 | LLM 편집 방식 | LLM 이 자기 편집 도구로 파일을 직접 수정 | 바뀐 부분만 쓴다. 전체 재생성은 느리다 |
 | 대화 단위 | 프로젝트 하나에 대화 하나. 요청마다 현재 페이지를 알린다 | 여러 페이지 요청이 맥락을 공유 |
@@ -62,7 +62,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 원본을 직접 고치거나 
  ├─ /api/events    열린 파일·design.css 변경 알림 (SSE)
  ├─ /api/ui·ui/commands  브라우저 화면 상태, 브라우저로 보내는 명령
  ├─ /mcp           외부 에이전트용 MCP 서버
- └─ llm.Provider   PoC: claude -p (작업 폴더 = 디자인 폴더)
+ └─ llm.Provider   claude -p 또는 codex exec (작업 폴더 = 디자인 폴더)
 ```
 
 ```
@@ -80,11 +80,11 @@ designs/
 
 ## 5. LLM provider
 
-hunsu 는 특정 LLM·에이전트를 전제하지 않는다. `claude -p` 는 PoC 구현일 뿐이다.
+hunsu 는 특정 LLM·에이전트를 전제하지 않는다. `claude -p`, `codex exec` 는 provider 구현일 뿐이다.
 
 | 방향 | 통로 | 현재 | 교체·추가 |
 |---|---|---|---|
-| hunsu → LLM (브라우저 채팅) | `llm.Provider` | `internal/claude` | API, Codex 등. `main.go` 의 `provider()` |
+| hunsu → LLM (브라우저 채팅) | `llm.Provider` | `internal/claude`, `internal/codex` | API 등. `main.go` 의 `providers` |
 | 에이전트 → hunsu | MCP | 모든 MCP 클라이언트 | 등록만 하면 된다 |
 
 **계약** (`internal/llm`)
@@ -198,7 +198,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 - [x] 8. 렌더러: headless Chrome 스크린샷. `screenshot` MCP 도구를 내장 provider 와 외부 에이전트가 함께 쓴다. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 기능을 끈다
 - [x] 9. 내보내기: 폴더 ZIP(디자인 시스템·페이지·에셋, `.hunsu/` 제외), 페이지별 단일 HTML(`design.css` 링크를 `<style>` 로, 에셋 경로를 data URI 로), PNG(렌더러, 높이 16,000px 까지). 화면 막대의 [내보내기] 메뉴에서 받는다. Chrome 이 없으면 PNG 는 이유를 알린다
 - [x] 10. 버저닝: 버전은 디자인 파일 전체의 저장본(시각·이름·대표 페이지·썸네일). 요청이 끝나면 요청 내용을 이름으로, 요청 전에 사용자가 고친 내용이 있으면 '요청 전' 으로, [버전 저장] 으로 남긴다. 직전 버전과 내용이 같으면 남기지 않는다. 아무 버전으로 복원하고, 복원 전 상태와 복원 결과도 버전으로 남는다. [되돌리기] 는 지금처럼 요청·checkpoint·복원 직전으로 돌아간다. 썸네일은 대표 페이지(새로 만든 페이지 → 보고 있던 페이지 → 첫 페이지)를 1280×800 으로 찍고, Chrome 이 없으면 없다. 에셋은 넣지 않는다. 버전은 최근 100개, 되돌리기 스냅샷은 최근 50개만 남긴다. MCP `undo` 설명을 맞춘다
-- [ ] 11. Codex provider: `codex exec --json`. provider 선택, provider 별 대화 ID
+- [x] 11. Codex provider: `codex exec --json`(이어가기는 `exec resume`). 지시문은 `developer_instructions`, 도구는 `mcp_servers.hunsu`(자동 승인), 샌드박스는 `workspace-write`, 사용자 config·rules·프로젝트 AGENTS.md 는 끈다. 모델은 gpt-5.6-sol(기본)·terra·luna. provider 는 실행 인자 `-provider claude|codex` 로 고르고, 생략하면 설치된 것을 claude → codex 순으로 찾는다. 대화 ID 는 provider 별 파일(`.hunsu/session-<이름>`)
 - [ ] 12. 비교안(옵션): 한 요청에 2~3안, 나란히 보기, 고른 안이 페이지가 되고 나머지는 버전에 남는다
 
 **v1 마무리** (기능 뒤)
@@ -256,5 +256,16 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | `--safe-mode` 없이 `--restricted --strict-mcp-config` 로 격리되나 | 된다. 사용자·부모 폴더 CLAUDE.md, 설정, 사용자 플러그인이 섞이지 않는다. 입력 4,476 토큰(safe-mode 4,520) |
 | 도구 설명의 비용 | `screenshot` 하나 +254 토큰, `/mcp` 전체(도구 4개·안내문) +1,750 토큰 |
 | LLM 이 스스로 확인하나 | haiku 가 "모바일에서 확인하고 고쳐" 에 `screenshot` 을 불렀다. 10초 |
+
+**Codex provider** (2026-10-12, codex-cli 0.157.1, ChatGPT 로그인)
+
+| 질문 | 결과 |
+|---|---|
+| 작은 수정 (h1 문구, gpt-5.6-luna) | 14초. 이어서 묻기 4초 |
+| 기본 입력 | 약 18,700 토큰(claude 격리 4,500). 기능(apps·browser_use 등)을 꺼도 2,300 토큰만 준다. 기능 이름이 버전마다 바뀌어 끄지 않는다 |
+| 사용자 지침이 섞이나 | `--ignore-user-config` 로도 전역 `~/.codex/AGENTS.md` 는 들어간다. 끌 설정이 없다. 프로젝트 AGENTS.md 는 `project_doc_max_bytes=0` 으로 끈다 |
+| MCP 도구 | 기본은 승인이 필요해 exec 에서 거부된다. `default_tools_approval_mode="approve"` 로 된다. 이미지 결과를 읽는다 |
+| 실패 | `turn.failed` 를 보내고 종료 코드는 0 이다 |
+| 모델 | gpt-5.6-sol·terra·luna, gpt-5.5 모두 된다. 짧은 답 5~7초 |
 
 **MCP** (클라이언트: Claude Code, haiku): 선택 요소 색 변경 + 새 페이지 + 열기 14.7초. 도구 순서 `get_context` → `checkpoint` → 편집 → `open_page`. 브라우저 [되돌리기] 한 번으로 모두 복원. 토큰 없는 `/mcp` 401, 다른 출처 `/api/ui` 403.

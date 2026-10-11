@@ -19,7 +19,7 @@ The UI is currently Korean only; on-screen labels are given in parentheses.
 ## Requirements
 
 - macOS
-- [Claude Code](https://claude.com/claude-code) CLI (`claude`), logged in: LLM provider for the browser chat (PoC)
+- LLM for the browser chat: [Claude Code](https://claude.com/claude-code) CLI (`claude`) or [Codex](https://github.com/openai/codex) CLI (`codex`), logged in
 - Chrome (optional): lets the LLM look at the rendered result. Chromium, Edge and Brave work too; without one, only this feature is off
 - Go 1.27+: build only
 
@@ -30,7 +30,7 @@ go build -o hunsu .
 ./hunsu ~/designs      # defaults to the current directory
 ```
 
-Serves at `http://127.0.0.1:7777` and opens your browser. `-port 8888` changes the port, `-no-open` skips the browser.
+Serves at `http://127.0.0.1:7777` and opens your browser. `-port 8888` changes the port, `-no-open` skips the browser. `-provider codex` picks the LLM (by default the first installed of claude, codex).
 
 ## Usage
 
@@ -133,11 +133,16 @@ Pages keep CSS and JS inline and link only `design.css` and assets.
 
 ## LLM provider
 
-The browser chat's LLM sits behind the `llm.Provider` interface. The provider is chosen only in `main.go`; the Anthropic API, Codex, and others are added by implementing this interface ([`PLAN.md`](PLAN.md) section 5, Korean).
+The browser chat's LLM sits behind the `llm.Provider` interface. The provider is chosen only in `main.go`; the Anthropic API and others are added by implementing this interface ([`PLAN.md`](PLAN.md) section 5, Korean).
 
 With Chrome available, the provider gets an MCP server holding only the `screenshot` tool (`/mcp/render`). After creating or substantially changing a page, the LLM looks at the render itself and fixes what it sees.
 
-The current provider is the Claude Code CLI, running `claude -p` in the design folder per request. It keeps your settings, hooks, and MCP servers out, runs no commands, and only touches files in the folder. A small edit with haiku costs under a cent; a new page with opus about $0.3 ([`PLAN.md`](PLAN.md) section 11).
+| Provider | Runs | Isolation | Models |
+|---|---|---|---|
+| claude | `claude -p` per request | Keeps your settings, hooks, and MCP servers out; runs no commands; only touches files in the folder | opus (default), sonnet, haiku. A small edit with haiku costs under a cent |
+| codex | `codex exec` per request | Keeps your config, rules, and project AGENTS.md out; runs commands in a sandbox that can only write to the folder. Your global `~/.codex/AGENTS.md` is still loaded | gpt-5.6-sol (default), terra, luna. A small edit with luna takes about 14 s |
+
+Measurements: [`PLAN.md`](PLAN.md) section 11.
 
 ## Development
 
@@ -151,7 +156,7 @@ go test ./... && node --test web/
 | `internal/project` | Design folder access, blocking outside paths, assets, templates, design rules |
 | `internal/watch` | File change detection |
 | `internal/llm` | Provider contract |
-| `internal/claude` | PoC provider (`claude -p`) |
+| `internal/claude`, `internal/codex` | Providers (`claude -p`, `codex exec`) |
 | `internal/history` | Snapshots and undo |
 | `internal/render` | Headless Chrome screenshots |
 | `internal/export` | ZIP and single-file HTML export |
@@ -166,7 +171,6 @@ No external dependencies. Coding rules: [`CLAUDE.md`](CLAUDE.md); decisions and 
 ## Limitations
 
 - localhost protection is partial (`/mcp` token, `/api/ui` origin check); the rest comes before the v1 release.
-- Only one provider so far: the Claude Code CLI.
 - Pages an agent creates without `open_page` appear in the list on the next interaction.
 - Tested on macOS only. Only root `.html` files are pages.
 - Classes or ids added by page JavaScript at runtime may end up in the selection path, so an LLM edit may not apply.

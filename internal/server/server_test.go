@@ -24,6 +24,8 @@ import (
 
 type startProvider struct{}
 
+func (startProvider) Name() string { return "start" }
+
 func (startProvider) Models() []llm.Model { return []llm.Model{{ID: "fast", Label: "빠름"}} }
 
 func (startProvider) Run(_ context.Context, _ llm.Request, emit func(llm.Event)) error {
