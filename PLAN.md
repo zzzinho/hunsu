@@ -184,10 +184,8 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 - [x] 3. 요소 선택: 선택·손 도구, 새로고침 후 유지
 - [x] LLM provider 분리 (5), 외부 에이전트 MCP (7), 프롬프트 캐시 배치 (6)
 
-**v1**
+**v1 기능** (먼저)
 
-- [ ] 4. 보안·설치: 나머지 API 에 Host·Origin 검사. provider 계약에 `Status()`(설치·로그인 확인, 안내 명령). universal 바이너리를 GitHub Release 와 Homebrew tap 으로 배포. `/p/*` 가 `.hunsu/`·디렉터리 목록까지 서빙하는 범위 정리. MCP `initialize` 가 요청 버전을 그대로 돌려주는 협상 검토
-- [ ] 5. 영어 UI: 번역 모듈(영어 기본, 설정에서 한국어, 선택 기억). LLM 은 사용자가 쓴 언어로 답한다(`instructions.md` 의 "한국어 한두 문장" 수정). 프롬프트 라벨·터미널 출력 영어. provider 의 모델 라벨("haiku (빠름)")을 번역할 위치 결정
 - [ ] 6. 에셋: `assets/` 폴더(유일한 하위 폴더). 끌어다 놓아 업로드(이미지·폰트, 크기 제한). 목록을 프롬프트와 `get_context` 에. `rules.md` 의 "하위 폴더 금지, 이미지는 CSS·SVG" 수정. 되돌리기 스냅샷에 에셋 포함 여부 결정
 - [ ] 7. 텍스트 직접 수정: 렌더 화면에서 더블클릭해 문구를 고치면 원본에 반영
 - [ ] 8. 렌더러: headless Chrome 스크린샷. `screenshot` MCP 도구를 내장 provider 와 외부 에이전트가 함께 쓴다. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 기능을 끈다
@@ -195,6 +193,11 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 - [ ] 10. 버저닝: 요청마다 자동 + [버전 저장]. 시각·요청·썸네일 타임라인, 아무 버전으로 복원(복원도 새 버전). 되돌리기는 이전 버전으로. MCP `undo` 는 지금 브라우저 요청 스냅샷도 함께 되돌리므로 설명을 맞춘다
 - [ ] 11. Codex provider: `codex exec --json`. provider 선택, provider 별 대화 ID
 - [ ] 12. 비교안(옵션): 한 요청에 2~3안, 나란히 보기, 고른 안이 페이지가 되고 나머지는 버전에 남는다
+
+**v1 마무리** (기능 뒤)
+
+- [ ] 5. 영어 UI: 번역 모듈(영어 기본, 설정에서 한국어, 선택 기억). LLM 은 사용자가 쓴 언어로 답한다(`instructions.md` 의 "한국어 한두 문장" 수정). 프롬프트 라벨·터미널 출력 영어. provider 의 모델 라벨("haiku (빠름)")을 번역할 위치 결정
+- [ ] 4. 보안·설치: 나머지 API 에 Host·Origin 검사. provider 계약에 `Status()`(설치·로그인 확인, 안내 명령). universal 바이너리를 GitHub Release 와 Homebrew tap 으로 배포. `/p/*` 가 `.hunsu/`·디렉터리 목록까지 서빙하는 범위 정리. MCP `initialize` 가 요청 버전을 그대로 돌려주는 협상 검토
 
 ## 11. 측정값 (2026-10-09, claude 2.1.295)
 
