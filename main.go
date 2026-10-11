@@ -19,6 +19,7 @@ import (
 	"hunsu/internal/mcp"
 	"hunsu/internal/mcptools"
 	"hunsu/internal/project"
+	"hunsu/internal/render"
 	"hunsu/internal/server"
 	"hunsu/internal/ui"
 )
@@ -49,11 +50,6 @@ func run(dir string, port int, openBrowser bool) error {
 	if err != nil {
 		return err
 	}
-	assistant, err := chat.New(p, provider())
-	if err != nil {
-		return err
-	}
-	hub := ui.NewHub()
 	token, err := mcpToken()
 	if err != nil {
 		return err
@@ -62,14 +58,31 @@ func run(dir string, port int, openBrowser bool) error {
 	if err != nil {
 		return fmt.Errorf("%w (다른 포트는 -port 로 지정한다)", err)
 	}
+	url := "http://" + ln.Addr().String() + "/"
+	renderer := findRenderer(url + "p/")
+	var tools *llm.MCPServer
+	if renderer != nil {
+		tools = &llm.MCPServer{Name: "hunsu", URL: url + "mcp/render", Token: token}
+	}
+	assistant, err := chat.New(p, provider(tools))
+	if err != nil {
+		return err
+	}
+	hub := ui.NewHub()
 
+	info := mcp.Info{Name: "hunsu", Version: version}
 	mux := http.NewServeMux()
-	mux.Handle("/mcp", mcp.RequireToken(token, mcp.NewServer(mcp.Info{Name: "hunsu", Version: version}, mcptools.Instructions(), mcptools.New(p, assistant, hub)...)))
+	mux.Handle("/mcp", mcp.RequireToken(token, mcp.NewServer(info, mcptools.Instructions(), mcptools.New(p, assistant, hub, renderer)...)))
+	if renderer != nil {
+		mux.Handle("/mcp/render", mcp.RequireToken(token, mcp.NewServer(info, "", mcptools.Render(p, renderer)...)))
+	}
 	mux.Handle("/", server.New(p, assistant, hub, web, 500*time.Millisecond))
 
-	url := "http://" + ln.Addr().String() + "/"
 	fmt.Printf("hunsu: %s 를 %s 에서 엽니다\n", p.Dir(), url)
 	fmt.Printf("MCP 서버: %smcp (헤더 Authorization: Bearer %s). 클라이언트별 등록 방법은 README 참고\n", url, token)
+	if renderer == nil {
+		fmt.Println("Chrome 을 찾지 못해 screenshot 도구를 끈다")
+	}
 	if openBrowser {
 		exec.Command("open", url).Start()
 	}
@@ -78,8 +91,17 @@ func run(dir string, port int, openBrowser bool) error {
 
 // 브라우저 채팅을 처리할 LLM 을 고르는 유일한 곳이다. PoC 는 Claude Code CLI 를 쓰고,
 // 다른 LLM 은 llm.Provider 를 구현한 뒤 여기서 바꾼다.
-func provider() llm.Provider {
-	return claude.CLI{Path: "claude"}
+func provider(tools *llm.MCPServer) llm.Provider {
+	return claude.CLI{Path: "claude", Tools: tools}
+}
+
+// Chrome 이 없으면 nil 이다. 렌더 결과 확인 기능만 꺼지고 나머지는 그대로 동작한다.
+func findRenderer(base string) mcptools.Renderer {
+	path := render.Find()
+	if path == "" {
+		return nil
+	}
+	return render.Chrome{Path: path, Base: base}
 }
 
 func mcpToken() (string, error) {

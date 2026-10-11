@@ -21,6 +21,8 @@ test('stepText', (t) => table(t, [
   ['파일 쓰기는 파일 이름과 함께 보인다', { kind: 'write', file: 'a.html' }, 'a.html 쓰는 중'],
   ['쓴 양을 알면 KB 로 함께 보인다', { kind: 'write', file: 'a.html', size: 12698 }, 'a.html 쓰는 중 · 12.4KB'],
   ['답변을 쓰기 시작하면 답변 쓰는 중으로 보인다', { kind: 'answer' }, '답변 쓰는 중'],
+  ['화면 확인 도구는 화면을 확인하는 중으로 보인다', { kind: 'tool', text: 'screenshot' }, '화면 확인하는 중'],
+  ['그 밖의 도구는 도구 이름과 함께 보인다', { kind: 'tool', text: 'lookup' }, 'lookup 쓰는 중'],
   ['도구 실패는 재시도로 보인다', { kind: 'retry' }, '다시 시도하는 중'],
   ['모델의 실패는 이유와 함께 보인다', { kind: 'fail', text: 'error_max_turns' }, '실패: error_max_turns'],
   ['서버 오류는 이유와 함께 보인다', { kind: 'error', text: 'boom' }, '오류: boom'],

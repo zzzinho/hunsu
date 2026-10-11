@@ -20,6 +20,14 @@ type Request struct {
 	Model     string
 }
 
+// MCPServer 는 hunsu 가 provider 에게 건네는 도구 서버(MCP Streamable HTTP, Bearer 토큰)다.
+// provider 는 생성할 때 받아 LLM 이 그 도구를 쓸 수 있게 붙인다.
+type MCPServer struct {
+	Name  string
+	URL   string
+	Token string
+}
+
 type Model struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`

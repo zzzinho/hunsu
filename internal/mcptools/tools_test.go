@@ -22,6 +22,12 @@ func (idleProvider) Models() []llm.Model { return nil }
 
 func (idleProvider) Run(context.Context, llm.Request, func(llm.Event)) error { return nil }
 
+type fakeRenderer struct{}
+
+func (fakeRenderer) Screenshot(_ context.Context, page string, width int) ([]byte, error) {
+	return fmt.Appendf(nil, "%s@%d", page, width), nil
+}
+
 type fixture struct {
 	t       *testing.T
 	dir     string
@@ -37,7 +43,7 @@ func newFixture(t *testing.T) *fixture {
 		t.Fatal(err)
 	}
 	hub := ui.NewHub()
-	return &fixture{t: t, dir: dir, project: p, hub: hub, tools: mcptools.New(p, svc, hub)}
+	return &fixture{t: t, dir: dir, project: p, hub: hub, tools: mcptools.New(p, svc, hub, fakeRenderer{})}
 }
 
 func (f *fixture) call(name, args string) string {
@@ -47,7 +53,10 @@ func (f *fixture) call(name, args string) string {
 			if err != nil {
 				return "error: " + err.Error()
 			}
-			return out
+			if out.Image != nil {
+				return "image:" + string(out.Image) + " / " + out.Text
+			}
+			return out.Text
 		}
 	}
 	f.t.Fatalf("%s 도구가 없다", name)
@@ -104,6 +113,38 @@ func TestTools(t *testing.T) {
 		{"브라우저가 연결되어 있지 않으면 open_page 는 실패를 알린다",
 			func(f *fixture) string { return f.call("open_page", `{"page":"a.html"}`) },
 			"error: 연결된 브라우저가 없다. 사용자에게 hunsu 를 브라우저로 열어 달라고 한다"},
+		{"screenshot 은 페이지를 요청한 너비로 렌더한 이미지를 돌려준다",
+			func(f *fixture) string { return f.call("screenshot", `{"page":"a.html","width":390}`) },
+			"image:a.html@390 / a.html, 너비 390px"},
+		{"screenshot 의 너비를 정하지 않으면 1280px 로 찍는다",
+			func(f *fixture) string { return f.call("screenshot", `{"page":"a.html"}`) },
+			"image:a.html@1280 / a.html, 너비 1280px"},
+		{"screenshot 은 320~2560px 너비만 받는다",
+			func(f *fixture) string { return f.call("screenshot", `{"page":"a.html","width":100}`) },
+			"error: 너비는 320~2560px 이다"},
+		{"screenshot 은 없는 페이지를 찍지 않는다",
+			func(f *fixture) string { return f.call("screenshot", `{"page":"none.html"}`) },
+			"error: none.html 은 페이지가 아니다. get_context 의 pages 중에서 고른다"},
+		{"Chrome 이 없으면 screenshot 도구를 내놓지 않는다",
+			func(f *fixture) string {
+				svc, err := chat.New(f.project, idleProvider{})
+				f.must(err)
+				var names []string
+				for _, tool := range mcptools.New(f.project, svc, f.hub, nil) {
+					names = append(names, tool.Name)
+				}
+				return strings.Join(names, ",")
+			},
+			"get_context,checkpoint,undo,open_page"},
+		{"브라우저 채팅의 provider 에는 화면 확인 도구만 준다",
+			func(f *fixture) string {
+				var names []string
+				for _, tool := range mcptools.Render(f.project, fakeRenderer{}) {
+					names = append(names, tool.Name)
+				}
+				return strings.Join(names, ",")
+			},
+			"screenshot"},
 		{"없는 페이지는 열지 않는다",
 			func(f *fixture) string { return f.call("open_page", `{"page":"none.html"}`) },
 			"error: none.html 은 페이지가 아니다. get_context 의 pages 중에서 고른다"},

@@ -4,7 +4,7 @@
 |---|---|
 | 상태 | MVP(마일스톤 0~3) 구현 완료. v1(마일스톤 4~12)은 `PLAN.md` 10 순서로 구현 중 |
 | 기준 | 결정·측정값의 기준은 `PLAN.md`. 이 문서는 그 결정의 이유와 트레이드오프를 모은다 |
-| 표기 | **(v1)** = 아직 구현하지 않은 계획. 표시 없음 = 구현됨. A1~A20 = 4절의 대안 |
+| 표기 | **(v1)** = 아직 구현하지 않은 계획. 표시 없음 = 구현됨. A1~A22 = 4절의 대안 |
 | 작성일 | 2026-10-11 |
 
 ## 1. Context and scope
@@ -119,7 +119,7 @@ hunsu (127.0.0.1:7777)
 | 프로젝트 하나에 대화 하나. 요청마다 현재 페이지를 알린다 (A5) | 새 페이지·여러 페이지 요청이 맥락을 공유한다 | 대화가 길어진다. 그래서 캐시 배치가 중요하다. [새 대화] 로 끊는다 |
 | 고정된 것은 system prompt, 바뀌는 것은 요청 끝 (A6) | 프롬프트 캐시는 앞부분이 같아야 재사용된다. 측정상 캐시 비용 약 4배 차이 | 요청 메시지가 길어진다 |
 | 디자인 시스템: 대화의 첫 요청(새 대화·서버 재시작 포함)에 전체, 이후에는 사용자가 바꾼 파일만 | 캐시를 깨지 않고 토큰도 아낀다. LLM 이 고친 내용은 LLM 이 이미 안다 | LLM 이 자기 수정을 대화 기록으로 기억한다고 가정한다 |
-| `[알림]`: 응답 직후 파일 해시를 기억하고, 다음 요청에서 달라진 파일을 알린다. 되돌리기·외부 에이전트 수정도 포함 | 없으면 예전 내용으로 Edit 하다 실패해 6초가 17초가 된다 | 해시는 메모리에만 있다 (7절 5) |
+| `[알림]`: 응답 직후 파일 해시를 기억하고, 다음 요청에서 달라진 파일을 알린다. 되돌리기·외부 에이전트 수정도 포함 | 없으면 예전 내용으로 Edit 하다 실패해 6초가 17초가 된다 | 해시는 메모리에만 있다 (7절 3) |
 | 선택한 요소 = 선택자 + HTML 앞 2000자 | `body` 같은 큰 요소는 페이지 전체가 된다. 위치는 선택자로 안다 | 큰 요소는 HTML 이 잘린다 |
 | 디자인 규칙은 한 곳(`internal/project/rules.md`). 브라우저 채팅 system prompt 와 MCP 안내문이 공유 | 두 경로의 LLM 이 같은 규칙을 따른다 | 규칙 문구가 두 경로 모두에 맞아야 한다 |
 
@@ -179,7 +179,8 @@ type Provider interface {
 	// (v1) Status(): 설치·로그인 확인과 안내 명령
 }
 // Request: Dir, Prompt, SystemPrompt, SessionID(비면 새 대화), Model
-// Event:   start(SessionID) · think · read(file) · write(file, size) · answer · retry · reply(text) · fail(text)
+// Event:   start(SessionID) · think · read(file) · write(file, size) · answer · tool(text) · retry · reply(text) · fail(text)
+// MCPServer: provider 를 만들 때 건네는 도구 서버 (Name, URL, Token)
 ```
 
 - 대화 ID 는 provider 가 `start` 로 알리고 hunsu 가 다음 `Request.SessionID` 로 돌려준다. hunsu 는 그 값을 해석하지 않는다.
@@ -193,7 +194,7 @@ type Provider interface {
 | `checkpoint` | 고치기 전 스냅샷. 브라우저 [되돌리기] 와 같은 스택 |
 | `undo` | 마지막 스냅샷으로 복원. 그 뒤 생긴 페이지는 지운다 |
 | `open_page` | 연결된 브라우저에 페이지를 연다. 브라우저가 없으면 오류 |
-| (v1) `screenshot` | 렌더 결과 이미지. 내장 provider 와 외부 에이전트가 함께 쓴다 |
+| `screenshot` | 렌더 결과 PNG. Chrome 이 있을 때만. 내장 provider 에는 이 도구만 둔 `/mcp/render` 로 건넨다 |
 
 **HTTP API**
 
@@ -205,7 +206,8 @@ type Provider interface {
 | `/api/models`, `/api/undo`, `/api/chat/reset` | 모델 목록, 되돌리기, 새 대화 | 127.0.0.1 |
 | `GET /api/events` | 지정한 파일의 변경 알림 (SSE) | 127.0.0.1 |
 | `POST /api/ui`, `GET /api/ui/commands` | 화면 상태 보고, 브라우저 명령 (SSE) | 보고는 + Origin |
-| `POST /mcp` | MCP | + Bearer 토큰 |
+| `POST /mcp` | MCP (외부 에이전트) | + Bearer 토큰 |
+| `POST /mcp/render` | MCP, `screenshot` 만 (내장 provider) | + Bearer 토큰 |
 
 (v1) 마일스톤 4 에서 나머지 API 에 Host·Origin 검사를 더한다.
 
@@ -232,7 +234,7 @@ type Provider interface {
 | 5. 영어 UI | 번역 모듈. LLM 은 사용자가 쓴 언어로 답한다. 프롬프트 라벨·터미널 출력은 영어 | web, chat 프롬프트 |
 | 6. 에셋 (구현됨) | `assets/` 에 끌어다 놓아 업로드(이미지·폰트, 10MB). 목록을 프롬프트와 `get_context` 에 | project, 디자인 규칙 |
 | 7. 텍스트 직접 수정 (구현됨) | 렌더에서 더블클릭해 고친 문구를 원본에 반영. 같은 문구 중 몇 번째인지로 원본 위치를 찾는다 | web |
-| 8. 렌더러 | headless Chrome 스크린샷. `screenshot` 도구 공용. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 끈다 (A17) | 새 패키지, mcptools, provider |
+| 8. 렌더러 (구현됨) | headless Chrome 스크린샷. `screenshot` 도구 공용. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 끈다 (A17) | 새 패키지, mcptools, provider |
 | 9. 내보내기 | 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용) | 새 패키지 |
 | 10. 버저닝 | 3.3 되돌리기·버저닝의 타임라인 | history 대체 |
 | 11. Codex provider | `codex exec --json`. provider 선택, provider 별 대화 ID. provider 계약이 실제로 교체 가능한지 확인하는 첫 사례 | 새 provider 패키지, main.go, session |
@@ -255,7 +257,7 @@ type Provider interface {
 |---|---|---|---|---|
 | A4 | 편집 방식 | LLM 이 편집 도구로 파일 직접 수정 | 전체 HTML 재생성 | 출력이 파일 크기만큼 늘어난다. 새 페이지 쓰기가 opus 80초인데, 작은 수정마다 그만큼 걸린다 |
 | A7 | 진행 표시 | 부분 스트리밍 (`--include-partial-messages`) | 완성 메시지만 | 큰 파일을 쓰는 80초 동안 이벤트가 없다 (측정) |
-| A8 | 격리 | `--safe-mode`, `--restricted`, `--strict-mcp-config`, `--tools` | `--bare` / 격리 안 함 | `--bare` 는 OAuth 를 읽지 않아 API 키가 필수다. 구독 로그인 사용자가 못 쓴다. 격리 안 함은 15.8초·$0.210 대 7.3초·$0.022 |
+| A8 | 격리 | `--safe-mode`, `--restricted`, `--strict-mcp-config`, `--tools`. 도구를 붙일 때는 `--safe-mode` 를 뺀다 | `--bare` / 격리 안 함 | `--bare` 는 OAuth 를 읽지 않아 API 키가 필수다. 구독 로그인 사용자가 못 쓴다. 격리 안 함은 15.8초·$0.210 대 7.3초·$0.022. `--safe-mode` 는 `--mcp-config` 서버까지 끈다 |
 | A9 | 프롬프트 전달 | 표준 입력 | 인자 | `-` 로 시작하는 요청이 플래그로 해석된다 |
 
 **컨텍스트**
@@ -285,6 +287,8 @@ type Provider interface {
 
 | # | 주제 | 채택 | 기각한 대안 | 기각 이유 |
 |---|---|---|---|---|
+| A21 | Chrome 구동 | `--remote-debugging-pipe` 로 DevTools 프로토콜 | WebSocket 직접 구현 / CLI `--screenshot` | WebSocket 은 표준 라이브러리에 없다. CLI 는 보이는 영역만 찍고, SSE 처럼 연결이 남는 페이지에서 끝나지 않는다 |
+| A22 | 내장 provider 의 도구 | 화면 확인 도구만 둔 `/mcp/render` 를 provider 에 건넨다 | `/mcp` 전체 / provider 안에 도구 구현 | `/mcp` 전체는 실행 중 잠금으로 실패하는 `checkpoint`·`undo` 가 보이고 입력이 1,750 토큰 늘어난다. provider 안 구현은 provider 마다 반복된다 |
 | A17 | 렌더 확인 (v1) | LLM 이 시점 판단 | 매 요청 / 사용자 토글 | 매 요청은 작은 수정의 시간·비용을 늘린다. 토글은 사용자가 요청마다 판단해야 한다 |
 | A18 | 직접 조작 (v1) | 텍스트만 | 속성 패널 / 없음 | 속성 패널은 범위가 크고 시각 속성은 LLM·에디터로 고친다. 없으면 문구 하나에 LLM 7초~1분 이상 |
 | A19 | 캔버스 | 파일 1개 미리보기 | 무한 다중 프레임 | 작업량이 크고 MVP 핵심(원본·LLM 편집)과 무관하다 |
@@ -361,12 +365,10 @@ type Provider interface {
 
 ## 7. 미결 사항
 
-1. **`screenshot` 을 내장 provider 에 붙이는 방법** (마일스톤 8). claude provider 는 `--strict-mcp-config`·`--tools Read,Edit,Write` 로 MCP 를 쓰지 않는다. hunsu MCP 를 그대로 붙이면 `checkpoint`·`undo` 도 보이는데, 실행 중에는 잠금 때문에 실패한다. 현재 MCP 응답은 텍스트만 돌려준다.
-2. **Chrome 구동 방식**. 의존성 0 에서 CDP(WebSocket)를 직접 구현할지, headless CLI 의 스크린샷 기능을 쓸지.
-3. **provider 선택 주체** (마일스톤 11). "고르는 곳은 `main.go` 하나" 와 "provider 선택" 의 관계. 런타임 선택이면 `main.go` 는 목록을 등록하고 `chat` 이 고른다. `.hunsu/session` 은 provider 별로 나뉜다.
-4. **비교안 생성 방식** (마일스톤 12). 한 실행에서 여러 파일을 쓸지, 여러 실행을 돌릴지. "프로젝트당 하나만 실행" 과 단일 대화 규칙과의 관계.
-5. **`[알림]` 의 재시작 공백**. 파일 해시가 메모리에만 있어, 서버 재시작 사이에 사용자가 고친 페이지는 이어진 대화에 알리지 못한다. 디자인 시스템만 전체를 다시 보낸다.
-6. **버전 저장 공간** (마일스톤 10). 요청마다 전체 복사 + 썸네일의 정리 정책. 썸네일은 렌더러에 의존하는데 Chrome 이 없을 때의 처리. `assets/` 를 버전에 넣을지.
-7. **동시 편집**. 외부 에이전트의 편집과 브라우저 채팅 실행 사이에 잠금이 없다.
-8. **빈 프로젝트의 파일 목록**. 프롬프트에 넣으면 없는 파일을 읽는 4초를 줄일 수 있다고 측정했지만 마일스톤에 없다.
-9. **Codex provider 의 동등성**. 격리, 폴더 밖 차단, 부분 스트리밍이 claude provider 와 같은 수준인지 아직 재지 않았다.
+1. **provider 선택 주체** (마일스톤 11). "고르는 곳은 `main.go` 하나" 와 "provider 선택" 의 관계. 런타임 선택이면 `main.go` 는 목록을 등록하고 `chat` 이 고른다. `.hunsu/session` 은 provider 별로 나뉜다.
+2. **비교안 생성 방식** (마일스톤 12). 한 실행에서 여러 파일을 쓸지, 여러 실행을 돌릴지. "프로젝트당 하나만 실행" 과 단일 대화 규칙과의 관계.
+3. **`[알림]` 의 재시작 공백**. 파일 해시가 메모리에만 있어, 서버 재시작 사이에 사용자가 고친 페이지는 이어진 대화에 알리지 못한다. 디자인 시스템만 전체를 다시 보낸다.
+4. **버전 저장 공간** (마일스톤 10). 요청마다 전체 복사 + 썸네일의 정리 정책. 썸네일은 렌더러에 의존하는데 Chrome 이 없을 때의 처리. `assets/` 를 버전에 넣을지.
+5. **동시 편집**. 외부 에이전트의 편집과 브라우저 채팅 실행 사이에 잠금이 없다.
+6. **빈 프로젝트의 파일 목록**. 프롬프트에 넣으면 없는 파일을 읽는 4초를 줄일 수 있다고 측정했지만 마일스톤에 없다.
+7. **Codex provider 의 동등성**. 격리, 폴더 밖 차단, 부분 스트리밍이 claude provider 와 같은 수준인지 아직 재지 않았다.

@@ -30,38 +30,41 @@ var errNoBrowser = errors.New("연결된 브라우저가 없다. 사용자에게
 
 func Instructions() string { return guide + project.Rules }
 
-func New(p *project.Project, assistant *chat.Service, hub *ui.Hub) []mcp.Tool {
-	return []mcp.Tool{
+func New(p *project.Project, assistant *chat.Service, hub *ui.Hub, renderer Renderer) []mcp.Tool {
+	tools := []mcp.Tool{
 		{
 			Name:        "get_context",
 			Description: "hunsu 에서 사용자가 보고 있는 것을 알려준다: 디자인 폴더의 절대 경로, 페이지 목록, 사용자가 올린 에셋(이미지·폰트) 경로, 디자인 시스템(DESIGN.md, design.css) 내용, 브라우저에 보이는 페이지, 브라우저에서 선택한 요소(CSS 선택자와 HTML). 디자인 작업을 시작할 때와 사용자가 '이거', '선택한 것' 이라고 할 때 호출한다.",
 			InputSchema: noArgs,
-			Call:        func(context.Context, json.RawMessage) (string, error) { return workspaceOf(p, hub) },
+			Call:        func(context.Context, json.RawMessage) (mcp.Result, error) { return text(workspaceOf(p, hub)) },
 		},
 		{
 			Name:        "checkpoint",
 			Description: "디자인 파일을 고치기 전에 지금 상태를 저장한다. 사용자는 브라우저의 [되돌리기] 나 undo 도구로 이 시점에 돌아갈 수 있다. 요청 하나에서 파일을 고치기 시작하기 전에 한 번 호출한다.",
 			InputSchema: noArgs,
-			Call: func(context.Context, json.RawMessage) (string, error) {
-				return "되돌릴 시점을 저장했다", assistant.Checkpoint()
+			Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
+				return mcp.Result{Text: "되돌릴 시점을 저장했다"}, assistant.Checkpoint()
 			},
 		},
 		{
 			Name:        "undo",
 			Description: "마지막 checkpoint 시점으로 디자인 파일을 되돌린다. 그 뒤에 생긴 페이지는 지운다.",
 			InputSchema: noArgs,
-			Call: func(context.Context, json.RawMessage) (string, error) {
-				return "마지막 checkpoint 시점으로 되돌렸다", assistant.Undo()
+			Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
+				return mcp.Result{Text: "마지막 checkpoint 시점으로 되돌렸다"}, assistant.Undo()
 			},
 		},
 		{
 			Name:        "open_page",
 			Description: "브라우저의 hunsu 화면에 페이지를 연다. 새 페이지를 만들었거나 지금 보이지 않는 페이지를 고쳤을 때 호출한다.",
 			InputSchema: pageArg,
-			Call:        func(_ context.Context, args json.RawMessage) (string, error) { return openPage(p, hub, args) },
+			Call:        func(_ context.Context, args json.RawMessage) (mcp.Result, error) { return text(openPage(p, hub, args)) },
 		},
 	}
+	return append(tools, Render(p, renderer)...)
 }
+
+func text(s string, err error) (mcp.Result, error) { return mcp.Result{Text: s}, err }
 
 type workspace struct {
 	Folder       string            `json:"folder"`
@@ -99,16 +102,23 @@ func openPage(p *project.Project, hub *ui.Hub, args json.RawMessage) (string, er
 	if err := json.Unmarshal(args, &in); err != nil {
 		return "", err
 	}
-	listing, err := p.List()
-	if err != nil {
+	if err := requirePage(p, in.Page); err != nil {
 		return "", err
-	}
-	if !slices.Contains(listing.Pages, in.Page) {
-		return "", fmt.Errorf("%s 은 페이지가 아니다. get_context 의 pages 중에서 고른다", in.Page)
 	}
 	sent := hub.Send(ui.Command{Kind: ui.Open, Page: in.Page})
 	if sent == 0 {
 		return "", errNoBrowser
 	}
 	return fmt.Sprintf("브라우저 %d곳에서 %s 을 열었다", sent, in.Page), nil
+}
+
+func requirePage(p *project.Project, page string) error {
+	listing, err := p.List()
+	if err != nil {
+		return err
+	}
+	if !slices.Contains(listing.Pages, page) {
+		return fmt.Errorf("%s 은 페이지가 아니다. get_context 의 pages 중에서 고른다", page)
+	}
+	return nil
 }

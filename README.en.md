@@ -19,6 +19,7 @@ The UI is currently Korean only; on-screen labels are given in parentheses.
 
 - macOS
 - [Claude Code](https://claude.com/claude-code) CLI (`claude`), logged in: LLM provider for the browser chat (PoC)
+- Chrome (optional): lets the LLM look at the rendered result. Chromium, Edge and Brave work too; without one, only this feature is off
 - Go 1.27+: build only
 
 ## Run
@@ -91,6 +92,7 @@ hunsu runs a standard MCP (Streamable HTTP) server. Agents read the browser stat
 | `checkpoint` | Save before editing; restorable with the browser's Undo |
 | `undo` | Restore the last checkpoint |
 | `open_page` | Open a page in the browser |
+| `screenshot` | Rendered image of a page (when Chrome is available) |
 
 The token is created once at `~/Library/Application Support/hunsu/mcp-token` (0600) and reused.
 
@@ -121,6 +123,8 @@ Pages keep CSS and JS inline and link only `design.css` and assets.
 
 The browser chat's LLM sits behind the `llm.Provider` interface. The provider is chosen only in `main.go`; the Anthropic API, Codex, and others are added by implementing this interface ([`PLAN.md`](PLAN.md) section 5, Korean).
 
+With Chrome available, the provider gets an MCP server holding only the `screenshot` tool (`/mcp/render`). After creating or substantially changing a page, the LLM looks at the render itself and fixes what it sees.
+
 The current provider is the Claude Code CLI, running `claude -p` in the design folder per request. It keeps your settings, hooks, and MCP servers out, runs no commands, and only touches files in the folder. A small edit with haiku costs under a cent; a new page with opus about $0.3 ([`PLAN.md`](PLAN.md) section 11).
 
 ## Development
@@ -137,6 +141,7 @@ go test ./... && node --test web/
 | `internal/llm` | Provider contract |
 | `internal/claude` | PoC provider (`claude -p`) |
 | `internal/history` | Snapshots and undo |
+| `internal/render` | Headless Chrome screenshots |
 | `internal/chat` | Request handling: one run at a time, prompt assembly, conversation |
 | `internal/server` | HTTP API for the browser |
 | `internal/ui` | Browser screen state and commands |

@@ -17,6 +17,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 렌더 화면을 보며 원본
 
 - macOS
 - [Claude Code](https://claude.com/claude-code) CLI (`claude`), 로그인 상태: 브라우저 채팅의 LLM provider (PoC)
+- Chrome (선택): LLM 이 렌더 결과를 보고 확인한다. Chromium·Edge·Brave 도 된다. 없으면 이 기능만 꺼진다
 - Go 1.27+: 빌드할 때만
 
 ## 실행
@@ -89,6 +90,7 @@ hunsu 는 표준 MCP(Streamable HTTP) 서버를 연다. 에이전트가 브라�
 | `checkpoint` | 고치기 전 저장. 브라우저 [되돌리기] 로 복원 가능 |
 | `undo` | 마지막 checkpoint 로 복원 |
 | `open_page` | 브라우저에 페이지 열기 |
+| `screenshot` | 페이지를 렌더한 이미지 (Chrome 이 있을 때) |
 
 토큰은 `~/Library/Application Support/hunsu/mcp-token`(0600)에 한 번 만들어 재사용한다.
 
@@ -119,6 +121,8 @@ designs/
 
 브라우저 채팅의 LLM 은 `llm.Provider` 인터페이스 뒤에 있다. provider 는 `main.go` 에서만 고르고, API·Codex 등은 이 인터페이스를 구현해 추가한다 ([`PLAN.md`](PLAN.md) 5).
 
+Chrome 이 있으면 provider 에게 `screenshot` 도구만 둔 MCP 서버(`/mcp/render`)를 건넨다. LLM 은 새 페이지를 만들었거나 크게 바꾼 뒤 스스로 렌더 결과를 보고 고친다.
+
 현재 provider 는 Claude Code CLI 다. 요청마다 디자인 폴더에서 `claude -p` 를 실행한다. 사용자 설정·hook·MCP 를 섞지 않고, 명령 실행 없이 폴더 안 파일만 다룬다. 작은 수정은 haiku 로 1센트 미만, opus 로 새 페이지는 약 $0.3 ([`PLAN.md`](PLAN.md) 11).
 
 ## 개발
@@ -135,6 +139,7 @@ go test ./... && node --test web/
 | `internal/llm` | provider 계약 |
 | `internal/claude` | PoC provider (`claude -p`) |
 | `internal/history` | 스냅샷과 되돌리기 |
+| `internal/render` | headless Chrome 스크린샷 |
 | `internal/chat` | 요청 처리: 동시 실행 막기, 프롬프트 조립, 대화 이어가기 |
 | `internal/server` | 브라우저용 HTTP API |
 | `internal/ui` | 브라우저 화면 상태와 명령 |

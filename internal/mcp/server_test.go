@@ -16,12 +16,21 @@ var echo = mcp.Tool{
 	Name:        "echo",
 	Description: "글을 그대로 돌려준다",
 	InputSchema: map[string]any{"type": "object", "properties": map[string]any{"text": map[string]any{"type": "string"}}},
-	Call: func(_ context.Context, args json.RawMessage) (string, error) {
+	Call: func(_ context.Context, args json.RawMessage) (mcp.Result, error) {
 		var in struct {
 			Text string `json:"text"`
 		}
 		err := json.Unmarshal(args, &in)
-		return in.Text, err
+		return mcp.Result{Text: in.Text}, err
+	},
+}
+
+var picture = mcp.Tool{
+	Name:        "picture",
+	Description: "그림과 설명을 돌려준다",
+	InputSchema: map[string]any{"type": "object"},
+	Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
+		return mcp.Result{Image: []byte("png"), Text: "설명"}, nil
 	},
 }
 
@@ -29,7 +38,7 @@ var broken = mcp.Tool{
 	Name:        "broken",
 	Description: "항상 실패한다",
 	InputSchema: map[string]any{"type": "object"},
-	Call:        func(context.Context, json.RawMessage) (string, error) { return "", errors.New("고장") },
+	Call:        func(context.Context, json.RawMessage) (mcp.Result, error) { return mcp.Result{}, errors.New("고장") },
 }
 
 func rpc(method, params string) string {
@@ -37,7 +46,7 @@ func rpc(method, params string) string {
 }
 
 func TestServer(t *testing.T) {
-	h := mcp.NewServer(mcp.Info{Name: "hunsu", Version: "test"}, "안내문", echo, broken)
+	h := mcp.NewServer(mcp.Info{Name: "hunsu", Version: "test"}, "안내문", echo, picture, broken)
 	tests := []struct {
 		name       string
 		method     string
@@ -54,6 +63,8 @@ func TestServer(t *testing.T) {
 			`{"name":"echo","description":"글을 그대로 돌려준다","inputSchema":{"properties":{"text":{"type":"string"}},"type":"object"}}`},
 		{"도구를 호출해 결과를 텍스트로 돌려준다", "POST", rpc("tools/call", `{"name":"echo","arguments":{"text":"안녕"}}`), 200,
 			`"result":{"content":[{"type":"text","text":"안녕"}]}`},
+		{"도구가 돌려준 PNG 는 텍스트 앞에 이미지로 담는다", "POST", rpc("tools/call", `{"name":"picture","arguments":{}}`), 200,
+			`"result":{"content":[{"type":"image","data":"cG5n","mimeType":"image/png"},{"type":"text","text":"설명"}]}`},
 		{"도구가 실패하면 결과에 에러로 표시한다", "POST", rpc("tools/call", `{"name":"broken","arguments":{}}`), 200,
 			`"result":{"content":[{"type":"text","text":"고장"}],"isError":true}`},
 		{"없는 도구를 부르면 잘못된 인자 에러로 답한다", "POST", rpc("tools/call", `{"name":"none","arguments":{}}`), 200, `"error":{"code":-32602`},
