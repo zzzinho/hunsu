@@ -15,7 +15,7 @@ A local, HTML-native design tool: edit pages by hand or have an LLM build and re
 - **Export**: folder ZIP, single-file HTML per page, PNG.
 - **Variants**: make 2–3 takes on one request at once, compare side by side, pick one.
 
-The UI is currently Korean only; on-screen labels are given in parentheses.
+The UI is in English by default; switch to Korean from the language menu above the file panel.
 
 ## Requirements
 
@@ -42,11 +42,11 @@ The screen has a file panel, render view, and editor & chat panel. Drag borders 
 **Chat**
 
 - Ask "make a café landing page", "add a menu page with the same design", "round the buttons on every page". New pages open automatically.
-- Progress shows like "writing index.html · 12.4KB · 23s". While running, Send (보내기) becomes Cancel (취소).
-- The conversation continues per project. New chat (새 대화) starts over.
-- Pick 2 or 3 variants (2안 비교, 3안 비교) before sending to build takes in different directions (faithful, bold, restrained) at once. Compare them side by side; Pick this one (이 안 고르기) makes it the current state and keeps the others as versions. Your files stay untouched until you pick.
-- Undo (되돌리기) restores the state before the last request; repeat to go further back.
-- Versions (버전) lists the version saved after every request, with thumbnails. Restore any of them (Undo reverts a restore too), or save one yourself with Save current state (지금 상태 저장). The last 100 are kept.
+- Progress shows like "Writing index.html · 12.4KB · 23s". While running, Send becomes Cancel.
+- The conversation continues per project. New chat starts over.
+- Choose Compare 2 or Compare 3 before sending to build takes in different directions (faithful, bold, restrained) at once. Compare them side by side; Pick this one makes it the current state and keeps the others as versions. Your files stay untouched until you pick.
+- Undo restores the state before the last request; repeat to go further back.
+- Versions lists the version saved after every request, with thumbnails. Restore any of them (Undo reverts a restore too), or save one yourself with Save current state. The last 100 are kept.
 - Models come from the provider. The claude provider defaults to opus, with sonnet and haiku. A new page takes about 1 min 40 s with opus, about 30 s with haiku.
 
 **Select an element**
@@ -75,11 +75,11 @@ Both are pinned at the top of the file panel (click to create if missing) and se
 
 **Assets**
 
-Drop images (png, jpg, gif, webp, avif, svg) or fonts (woff, woff2, ttf, otf) anywhere on the screen, or pick them with Upload (이미지·폰트 올리기), to save them in `assets/`. Up to 10 MB per file; existing names are rejected. The list is sent to the LLM with every request. Assets are not part of undo; delete them in Finder.
+Drop images (png, jpg, gif, webp, avif, svg) or fonts (woff, woff2, ttf, otf) anywhere on the screen, or pick them with Upload images or fonts, to save them in `assets/`. Up to 10 MB per file; existing names are rejected. The list is sent to the LLM with every request. Assets are not part of undo; delete them in Finder.
 
 **Export**
 
-Download from Export (내보내기) in the toolbar.
+Download from Export in the toolbar.
 
 | Item | Contents |
 |---|---|

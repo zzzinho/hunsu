@@ -13,7 +13,7 @@ import (
 	"hunsu/internal/project"
 )
 
-var ErrNoVersion = errors.New("없는 버전")
+var ErrNoVersion = errors.New("no such version")
 
 const (
 	versionsDir  = "versions"
@@ -26,13 +26,21 @@ const (
 // Thumbnailer 는 페이지의 썸네일 PNG 를 만든다.
 type Thumbnailer func(page string) ([]byte, error)
 
+// Note 는 버전을 남긴 까닭이다. Kind 는 남기는 쪽이 정하고, 화면이 Kind 에 맞는 문구로 바꾼다.
+// Text 는 요청 내용, Ref 는 관련 번호(복원한 버전, 안)다.
+type Note struct {
+	Kind string `json:"kind"`
+	Text string `json:"text,omitempty"`
+	Ref  int    `json:"ref,omitempty"`
+}
+
 type Version struct {
-	ID    int       `json:"id"`
-	Time  time.Time `json:"time"`
-	Label string    `json:"label"`
-	Page  string    `json:"page"`
-	Thumb bool      `json:"thumb"`
-	Hash  string    `json:"hash"`
+	ID   int       `json:"id"`
+	Time time.Time `json:"time"`
+	Note
+	Page  string `json:"page"`
+	Thumb bool   `json:"thumb"`
+	Hash  string `json:"hash"`
 }
 
 // Timeline 은 디자인 파일 전체의 저장본(버전)을 시간순으로 남긴다. 에셋은 넣지 않는다.
@@ -52,7 +60,7 @@ func NewTimeline(p *project.Project, thumb Thumbnailer) (*Timeline, error) {
 }
 
 // Keep 은 지금 상태를 버전으로 남긴다. 디자인 파일이 없거나 직전 버전과 같으면 남기지 않고 false 다.
-func (t *Timeline) Keep(label, page string) (bool, error) {
+func (t *Timeline) Keep(note Note, page string) (bool, error) {
 	listing, err := t.project.List()
 	if err != nil || len(listing.Files()) == 0 {
 		return false, err
@@ -73,7 +81,7 @@ func (t *Timeline) Keep(label, page string) (bool, error) {
 		}
 	}
 	number, _ := strconv.Atoi(id)
-	v := Version{ID: number, Time: time.Now(), Label: label, Page: page, Hash: hash}
+	v := Version{ID: number, Time: time.Now(), Note: note, Page: page, Hash: hash}
 	if t.thumb != nil && page != "" {
 		// 썸네일은 보기 좋으라고 두는 것이다. 만들지 못해도 버전은 남긴다.
 		if png, err := t.thumb(page); err == nil {

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -9,122 +9,126 @@
 <link rel="stylesheet" href="app.css">
 </head>
 <body>
-<nav class="files" aria-label="파일">
+<nav class="files" aria-label="Files" data-i18n-label="files.label">
   <header class="brand">
     <svg viewBox="0 0 32 20" aria-hidden="true">
       <circle cx="10" cy="10" r="8" class="stone-black"/>
       <circle cx="21" cy="10" r="8" class="stone-white"/>
     </svg>
     <span>hunsu</span>
+    <select id="lang" aria-label="Language" data-i18n-label="lang.label">
+      <option value="en">English</option>
+      <option value="ko">한국어</option>
+    </select>
   </header>
-  <h2>디자인 시스템</h2>
+  <h2 data-i18n="files.designSystem">Design system</h2>
   <ul id="design-system"></ul>
-  <h2>페이지</h2>
+  <h2 data-i18n="files.pages">Pages</h2>
   <ul id="pages"></ul>
   <form id="new-page">
-    <input name="name" placeholder="새 페이지 이름" aria-label="새 페이지 이름" required>
-    <button>추가</button>
+    <input name="name" placeholder="New page name" aria-label="New page name" data-i18n-placeholder="files.newPage" data-i18n-label="files.newPage" required>
+    <button data-i18n="files.add">Add</button>
   </form>
-  <h2>에셋</h2>
+  <h2 data-i18n="files.assets">Assets</h2>
   <ul id="assets"></ul>
-  <label class="upload" title="이미지·폰트를 화면에 끌어다 놓아도 된다">
+  <label class="upload" title="You can also drop images and fonts anywhere on the screen" data-i18n-title="files.uploadHint">
     <input type="file" multiple accept=".png,.jpg,.jpeg,.gif,.webp,.avif,.svg,.woff,.woff2,.ttf,.otf">
-    이미지·폰트 올리기
+    <span data-i18n="files.upload">Upload images or fonts</span>
   </label>
 </nav>
 <main class="preview">
   <div class="bar">
-    <button class="icon" data-panel="files" title="파일 목록 접기/펴기" aria-label="파일 목록">
+    <button class="icon" data-panel="files" title="Show or hide the file panel" aria-label="File panel" data-i18n-title="bar.files" data-i18n-label="bar.filesLabel">
       <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M7.5 3.5v13"/></svg>
     </button>
-    <div class="segmented tools" role="group" aria-label="렌더 화면 도구">
-      <button class="icon" data-tool="select" aria-pressed="true" title="선택 (V) · 클릭해서 구성 요소를 고르고, 더블클릭해서 문구를 고친다" aria-label="선택 도구">
+    <div class="segmented tools" role="group" aria-label="Render tools" data-i18n-label="bar.tools">
+      <button class="icon" data-tool="select" aria-pressed="true" title="Select (V)" aria-label="Select tool" data-i18n-title="tool.select" data-i18n-label="tool.selectLabel">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4.04 4.69a.5.5 0 0 1 .65-.65l16 6.5a.5.5 0 0 1-.06.95l-6.13 1.58a2 2 0 0 0-1.43 1.43l-1.58 6.13a.5.5 0 0 1-.95.06z"/></svg>
       </button>
-      <button class="icon" data-tool="hand" aria-pressed="false" title="손 (H) · 끌어서 페이지 안을 이동한다. 클릭은 그대로 동작" aria-label="손 도구">
+      <button class="icon" data-tool="hand" aria-pressed="false" title="Hand (H)" aria-label="Hand tool" data-i18n-title="tool.hand" data-i18n-label="tool.handLabel">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 11V6a2 2 0 0 0-4 0"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-6-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15"/></svg>
       </button>
     </div>
-    <div class="segmented" role="group" aria-label="미리보기 너비">
-      <button data-width="390" aria-pressed="false">모바일</button>
-      <button data-width="" aria-pressed="true">데스크톱</button>
+    <div class="segmented" role="group" aria-label="Preview width" data-i18n-label="bar.width">
+      <button data-width="390" aria-pressed="false" data-i18n="width.mobile">Mobile</button>
+      <button data-width="" aria-pressed="true" data-i18n="width.desktop">Desktop</button>
     </div>
-    <div class="zoom" role="group" aria-label="확대/축소">
-      <button class="icon" data-zoom="-1" title="축소 (⌘−)" aria-label="축소">
+    <div class="zoom" role="group" aria-label="Zoom" data-i18n-label="bar.zoom">
+      <button class="icon" data-zoom="-1" title="Zoom out (⌘−)" aria-label="Zoom out" data-i18n-title="zoom.out" data-i18n-label="zoom.outLabel">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10"/></svg>
       </button>
-      <button id="zoom-level" title="100% 로 돌아가기 (⌘0)">100%</button>
-      <button class="icon" data-zoom="1" title="확대 (⌘+)" aria-label="확대">
+      <button id="zoom-level" title="Back to 100% (⌘0)" data-i18n-title="zoom.reset">100%</button>
+      <button class="icon" data-zoom="1" title="Zoom in (⌘+)" aria-label="Zoom in" data-i18n-title="zoom.in" data-i18n-label="zoom.inLabel">
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 10h10M10 5v10"/></svg>
       </button>
     </div>
     <span class="spacer"></span>
     <details class="menu" id="export">
-      <summary>내보내기</summary>
+      <summary data-i18n="export.menu">Export</summary>
       <div class="menu-items">
-        <button data-export="html" data-page>이 페이지 · HTML 파일 하나</button>
-        <button data-export="png" data-page>이 페이지 · PNG</button>
-        <button data-export="zip">전체 폴더 · ZIP</button>
+        <button data-export="html" data-page data-i18n="export.html">This page · single HTML file</button>
+        <button data-export="png" data-page data-i18n="export.png">This page · PNG</button>
+        <button data-export="zip" data-i18n="export.zip">Whole folder · ZIP</button>
       </div>
     </details>
-    <button class="icon" data-panel="focus" title="렌더만 보기 (⌘\)" aria-label="렌더만 보기">
+    <button class="icon" data-panel="focus" title="Render only (⌘\)" aria-label="Render only" data-i18n-title="bar.focus" data-i18n-label="bar.focusLabel">
       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 7.5V3h4.5M17 7.5V3h-4.5M3 12.5V17h4.5M17 12.5V17h-4.5"/></svg>
     </button>
-    <button class="icon" data-panel="source" title="편집기·채팅 접기/펴기" aria-label="편집기와 채팅">
+    <button class="icon" data-panel="source" title="Show or hide the editor and chat" aria-label="Editor and chat" data-i18n-title="bar.source" data-i18n-label="bar.sourceLabel">
       <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2.5" y="3.5" width="15" height="13" rx="2"/><path d="M12.5 3.5v13"/></svg>
     </button>
   </div>
-  <div class="stage"><div class="frame-box"><iframe id="frame" title="렌더 화면"></iframe></div></div>
-  <div class="resizer" data-resize="files" role="separator" aria-orientation="vertical" aria-label="파일 패널 너비" aria-valuemin="160" aria-valuemax="480" tabindex="0" title="끌어서 크기 조절, 더블클릭하면 기본 크기"></div>
-  <div class="resizer" data-resize="source" role="separator" aria-orientation="vertical" aria-label="편집기·채팅 패널 너비" aria-valuemin="320" aria-valuemax="900" tabindex="0" title="끌어서 크기 조절, 더블클릭하면 기본 크기"></div>
+  <div class="stage"><div class="frame-box"><iframe id="frame" title="Render view" data-i18n-title="frame.title"></iframe></div></div>
+  <div class="resizer" data-resize="files" role="separator" aria-orientation="vertical" aria-label="File panel width" data-i18n-label="resize.files" aria-valuemin="160" aria-valuemax="480" tabindex="0" title="Drag to resize, double-click to reset" data-i18n-title="resize.hint"></div>
+  <div class="resizer" data-resize="source" role="separator" aria-orientation="vertical" aria-label="Editor and chat panel width" data-i18n-label="resize.source" aria-valuemin="320" aria-valuemax="900" tabindex="0" title="Drag to resize, double-click to reset" data-i18n-title="resize.hint"></div>
 </main>
-<section class="source" aria-label="편집기와 채팅">
+<section class="source" aria-label="Editor and chat" data-i18n-label="bar.sourceLabel">
   <div class="bar">
     <span id="open-path"></span>
-    <button id="save">저장</button>
+    <button id="save" data-i18n="save">Save</button>
   </div>
   <div id="editor"></div>
-  <section class="chat" aria-label="채팅">
-    <div class="resizer" data-resize="chat" role="separator" aria-orientation="horizontal" aria-label="채팅 높이" aria-valuemin="120" aria-valuemax="800" tabindex="0" title="끌어서 크기 조절, 더블클릭하면 기본 크기"></div>
+  <section class="chat" aria-label="Chat" data-i18n-label="chat.label">
+    <div class="resizer" data-resize="chat" role="separator" aria-orientation="horizontal" aria-label="Chat height" data-i18n-label="resize.chat" aria-valuemin="120" aria-valuemax="800" tabindex="0" title="Drag to resize, double-click to reset" data-i18n-title="resize.hint"></div>
     <ol id="messages"></ol>
     <form id="prompt">
       <div id="selection" class="chip" hidden>
-        <span>선택</span><code></code>
-        <button type="button" aria-label="선택 해제" title="선택 해제 (Esc)">×</button>
+        <span data-i18n="selection.label">Selected</span><code></code>
+        <button type="button" aria-label="Clear selection" title="Clear selection (Esc)" data-i18n-label="selection.clear" data-i18n-title="selection.clearHint">×</button>
       </div>
-      <textarea name="prompt" rows="3" placeholder="무엇을 만들거나 고칠까요? (Enter 보내기, Shift+Enter 줄바꿈)" aria-label="요청"></textarea>
+      <textarea name="prompt" rows="3" placeholder="What should I make or change?" aria-label="Request" data-i18n-label="prompt.label"></textarea>
       <div class="actions">
-        <select name="model" aria-label="모델"></select>
-        <select name="variants" aria-label="비교안" title="여러 안을 동시에 만들어 나란히 비교한다">
-          <option value="1">한 안</option>
-          <option value="2">2안 비교</option>
-          <option value="3">3안 비교</option>
+        <select name="model" aria-label="Model" data-i18n-label="model.label"></select>
+        <select name="variants" aria-label="Variants" title="Make several takes at once" data-i18n-label="variants.label" data-i18n-title="variants.hint">
+          <option value="1" data-i18n="variants.one">Single take</option>
+          <option value="2" data-i18n="variants.two">Compare 2</option>
+          <option value="3" data-i18n="variants.three">Compare 3</option>
         </select>
-        <button type="button" id="undo">되돌리기</button>
-        <button type="button" id="versions-open">버전</button>
-        <button type="button" id="new-chat">새 대화</button>
-        <button id="send" class="primary">보내기</button>
+        <button type="button" id="undo" data-i18n="undo">Undo</button>
+        <button type="button" id="versions-open" data-i18n="versions.open">Versions</button>
+        <button type="button" id="new-chat" data-i18n="newChat">New chat</button>
+        <button id="send" class="primary">Send</button>
       </div>
     </form>
   </section>
 </section>
 <dialog id="versions" class="sheet" aria-labelledby="versions-title">
   <header>
-    <h2 id="versions-title">버전</h2>
-    <button type="button" id="version-save">지금 상태 저장</button>
-    <button type="button" class="icon" id="versions-close" aria-label="닫기">×</button>
+    <h2 id="versions-title" data-i18n="versions.title">Versions</h2>
+    <button type="button" id="version-save" data-i18n="versions.save">Save current state</button>
+    <button type="button" class="icon" id="versions-close" aria-label="Close" data-i18n-label="close">×</button>
   </header>
-  <p class="hint">요청이 끝날 때마다 자동으로 남는다. 복원해도 [되돌리기] 로 돌아갈 수 있다.</p>
+  <p class="hint" data-i18n="versions.hint">A version is kept after every request.</p>
   <p class="hint note" id="version-note" role="status"></p>
   <ol id="version-list"></ol>
 </dialog>
 <dialog id="variants-dialog" class="sheet wide" aria-labelledby="variants-title">
   <header>
-    <h2 id="variants-title">비교안</h2>
-    <button type="button" id="variants-discard">모두 버리기</button>
-    <button type="button" class="icon" id="variants-close" aria-label="닫기">×</button>
+    <h2 id="variants-title" data-i18n="variants.title">Variants</h2>
+    <button type="button" id="variants-discard" data-i18n="variants.discard">Discard all</button>
+    <button type="button" class="icon" id="variants-close" aria-label="Close" data-i18n-label="close">×</button>
   </header>
-  <p class="hint">고른 안이 지금 상태가 되고, 나머지 안도 버전에 남는다. [되돌리기] 로 고르기 전으로 돌아간다.</p>
+  <p class="hint" data-i18n="variants.dialogHint">The take you pick becomes the current state.</p>
   <p class="hint note" id="variant-note" role="status"></p>
   <ol id="variant-list"></ol>
 </dialog>

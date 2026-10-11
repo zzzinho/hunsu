@@ -38,7 +38,7 @@ func (s *Server) variants(w http.ResponseWriter, r *http.Request) {
 func (s *Server) chooseVariant(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil {
-		http.Error(w, "안 번호가 숫자가 아니다", http.StatusBadRequest)
+		writeError(w, errBadID)
 		return
 	}
 	if err := s.chat.ChooseVariant(id, r.URL.Query().Get("page")); err != nil {

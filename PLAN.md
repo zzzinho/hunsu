@@ -203,7 +203,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 **v1 마무리** (기능 뒤)
 
-- [ ] 5. 영어 UI: 번역 모듈(영어 기본, 설정에서 한국어, 선택 기억). LLM 은 사용자가 쓴 언어로 답한다(`instructions.md` 의 "한국어 한두 문장" 수정). 프롬프트 라벨·터미널 출력 영어. provider 의 모델 라벨("haiku (빠름)")을 번역할 위치 결정
+- [x] 5. 영어 UI: 화면 문구는 `web/i18n.mjs` 사전(영어 기본, 한국어). 파일 패널 위 언어 선택으로 고르고 브라우저에 기억한다. 서버의 오류·터미널 출력·프롬프트 라벨·지시문·MCP 설명은 영어. 화면에 보이는 서버 오류는 `{"code","message"}` 로 받아 화면이 코드로 번역한다. LLM 은 사용자가 쓴 언어로 답한다. 모델은 provider 가 이름과 빠름 여부(`Model.Fast`)만 알리고 문구는 화면이 붙인다. 버전 이름은 종류(`kind`)·요청 내용·번호로 남기고 화면이 문구로 바꾼다
 - [ ] 4. 보안·설치: 나머지 API 에 Host·Origin 검사. provider 계약에 `Status()`(설치·로그인 확인, 안내 명령). universal 바이너리를 GitHub Release 와 Homebrew tap 으로 배포. `/p/*` 가 `.hunsu/`·디렉터리 목록까지 서빙하는 범위 정리. MCP `initialize` 가 요청 버전을 그대로 돌려주는 협상 검토
 
 ## 11. 측정값 (2026-10-09, claude 2.1.295)
@@ -267,5 +267,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | MCP 도구 | 기본은 승인이 필요해 exec 에서 거부된다. `default_tools_approval_mode="approve"` 로 된다. 이미지 결과를 읽는다 |
 | 실패 | `turn.failed` 를 보내고 종료 코드는 0 이다 |
 | 모델 | gpt-5.6-sol·terra·luna, gpt-5.5 모두 된다. 짧은 답 5~7초 |
+
+**답변 언어** (2026-10-12): 한국어 디자인 파일에 영어로 요청하면 opus 는 영어로, haiku 는 한국어로 답할 때가 있다. 빈 폴더에서는 둘 다 요청의 언어로 답한다.
 
 **MCP** (클라이언트: Claude Code, haiku): 선택 요소 색 변경 + 새 페이지 + 열기 14.7초. 도구 순서 `get_context` → `checkpoint` → 편집 → `open_page`. 브라우저 [되돌리기] 한 번으로 모두 복원. 토큰 없는 `/mcp` 401, 다른 출처 `/api/ui` 403.

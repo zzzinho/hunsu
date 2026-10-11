@@ -10,7 +10,7 @@ import (
 	"hunsu/internal/project"
 )
 
-var ErrNoVariant = errors.New("없는 안")
+var ErrNoVariant = errors.New("no such variant")
 
 const variantsDir = "variants"
 

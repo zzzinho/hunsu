@@ -22,11 +22,11 @@ var noArgs = map[string]any{"type": "object", "properties": map[string]any{}}
 
 var pageArg = map[string]any{
 	"type":       "object",
-	"properties": map[string]any{"page": map[string]any{"type": "string", "description": "열 페이지의 파일 이름 (예: index.html)"}},
+	"properties": map[string]any{"page": map[string]any{"type": "string", "description": "File name of the page to open (e.g. index.html)"}},
 	"required":   []string{"page"},
 }
 
-var errNoBrowser = errors.New("연결된 브라우저가 없다. 사용자에게 hunsu 를 브라우저로 열어 달라고 한다")
+var errNoBrowser = errors.New("no browser is connected. Ask the user to open hunsu in a browser")
 
 func Instructions() string { return guide + project.Rules }
 
@@ -34,29 +34,29 @@ func New(p *project.Project, assistant *chat.Service, hub *ui.Hub, renderer Rend
 	tools := []mcp.Tool{
 		{
 			Name:        "get_context",
-			Description: "hunsu 에서 사용자가 보고 있는 것을 알려준다: 디자인 폴더의 절대 경로, 페이지 목록, 사용자가 올린 에셋(이미지·폰트) 경로, 디자인 시스템(DESIGN.md, design.css) 내용, 브라우저에 보이는 페이지, 브라우저에서 선택한 요소(CSS 선택자와 HTML). 디자인 작업을 시작할 때와 사용자가 '이거', '선택한 것' 이라고 할 때 호출한다.",
+			Description: "Tells you what the user sees in hunsu: the design folder's absolute path, pages, uploaded asset (image and font) paths, design system contents (DESIGN.md, design.css), the page visible in the browser, and the element selected in the browser (CSS selector and HTML). Call it when you start design work and when the user says \"this\" or \"the selected one\".",
 			InputSchema: noArgs,
 			Call:        func(context.Context, json.RawMessage) (mcp.Result, error) { return text(workspaceOf(p, hub)) },
 		},
 		{
 			Name:        "checkpoint",
-			Description: "디자인 파일을 고치기 전에 지금 상태를 저장한다. 사용자는 브라우저의 [되돌리기] 나 undo 도구로 이 시점에 돌아갈 수 있다. 요청 하나에서 파일을 고치기 시작하기 전에 한 번 호출한다.",
+			Description: "Saves the current state before you edit design files. The user can return to it with Undo in the browser or the undo tool. Call it once per request, before you start editing files.",
 			InputSchema: noArgs,
 			Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
-				return mcp.Result{Text: "되돌릴 시점을 저장했다"}, assistant.Checkpoint()
+				return mcp.Result{Text: "saved a point to undo to"}, assistant.Checkpoint()
 			},
 		},
 		{
 			Name:        "undo",
-			Description: "마지막 checkpoint 시점으로 디자인 파일을 되돌린다. 브라우저의 [되돌리기] 와 같은 기록을 쓰므로, 그 뒤에 브라우저 채팅 요청이나 버전 복원이 있었으면 그 직전으로 먼저 돌아간다. 그 뒤에 생긴 페이지는 지운다.",
+			Description: "Restores design files to the last checkpoint. It shares history with Undo in the browser, so if a browser chat request or a version restore happened after the checkpoint, it goes back to just before that first. Pages created since are removed.",
 			InputSchema: noArgs,
 			Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
-				return mcp.Result{Text: "마지막 checkpoint 시점으로 되돌렸다"}, assistant.Undo()
+				return mcp.Result{Text: "restored the last checkpoint"}, assistant.Undo()
 			},
 		},
 		{
 			Name:        "open_page",
-			Description: "브라우저의 hunsu 화면에 페이지를 연다. 새 페이지를 만들었거나 지금 보이지 않는 페이지를 고쳤을 때 호출한다.",
+			Description: "Opens a page in hunsu in the browser. Call it after creating a page or editing one that is not visible.",
 			InputSchema: pageArg,
 			Call:        func(_ context.Context, args json.RawMessage) (mcp.Result, error) { return text(openPage(p, hub, args)) },
 		},
@@ -109,7 +109,7 @@ func openPage(p *project.Project, hub *ui.Hub, args json.RawMessage) (string, er
 	if sent == 0 {
 		return "", errNoBrowser
 	}
-	return fmt.Sprintf("브라우저 %d곳에서 %s 을 열었다", sent, in.Page), nil
+	return fmt.Sprintf("opened %[2]s in %[1]d browser(s)", sent, in.Page), nil
 }
 
 func requirePage(p *project.Project, page string) error {
@@ -118,7 +118,7 @@ func requirePage(p *project.Project, page string) error {
 		return err
 	}
 	if !slices.Contains(listing.Pages, page) {
-		return fmt.Errorf("%s 은 페이지가 아니다. get_context 의 pages 중에서 고른다", page)
+		return fmt.Errorf("%s is not a page. Pick one of get_context's pages", page)
 	}
 	return nil
 }

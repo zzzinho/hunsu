@@ -10,7 +10,7 @@ const (
 	maxWidth     = 2560
 )
 
-var ErrWidth = fmt.Errorf("너비는 %d~%dpx 이다", minWidth, maxWidth)
+var ErrWidth = fmt.Errorf("width must be %d–%d px", minWidth, maxWidth)
 
 // Width 는 렌더 너비를 정한다. 0 이면 데스크톱 기본 너비다.
 func Width(width int) (int, error) {

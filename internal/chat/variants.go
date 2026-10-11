@@ -15,15 +15,15 @@ import (
 )
 
 var (
-	ErrVariantCount = errors.New("비교안은 2개나 3개다")
-	ErrNoVariants   = errors.New("고를 비교안이 없다")
+	ErrVariantCount = errors.New("variants come in 2 or 3")
+	ErrNoVariants   = errors.New("no variants to pick from")
 )
 
 // 안마다 방향을 달리 주어야 같은 요청에서도 서로 다른 안이 나온다.
 var directions = []string{
-	"요청을 가장 충실하게 따른다",
-	"같은 요청을 더 과감한 색·글꼴·배치로 푼다",
-	"같은 요청을 더 단순하고 절제된 방향으로 푼다",
+	"Follow the request as faithfully as possible",
+	"Solve the same request with bolder color, type and layout",
+	"Solve the same request in a simpler, more restrained way",
 }
 
 type Variant struct {
@@ -68,7 +68,7 @@ func (s *Service) SendVariants(ctx context.Context, t Turn, count int, emit func
 	for i, dir := range dirs {
 		wg.Go(func() {
 			v := Variant{ID: i + 1}
-			note := fmt.Sprintf("%d개 중 %d번째 안. %s. 다른 안과 뚜렷이 달라야 한다.", count, v.ID, directions[i])
+			note := fmt.Sprintf("Take %d of %d. %s. Make it clearly different from the other takes.", v.ID, count, directions[i])
 			req := llm.Request{
 				Dir:          dir,
 				Prompt:       userPrompt(promptInput{turn: t, design: design, assets: before.Assets, variant: note}),
@@ -137,31 +137,31 @@ func (s *Service) ChooseVariant(id int, page string) error {
 	if err := s.history.Save(); err != nil {
 		return err
 	}
-	if _, err := s.timeline.Keep(beforeRequest, page); err != nil {
+	if _, err := s.timeline.Keep(history.Note{Kind: kindBeforeRequest}, page); err != nil {
 		return err
 	}
-	label := truncate(run.turn.Prompt, labelLimit)
+	text := truncate(run.turn.Prompt, labelLimit)
 	// 버전은 지금 파일로 남기므로, 나머지 안을 차례로 적용하며 남긴 뒤 고른 안을 마지막에 적용한다.
 	for _, v := range run.variants {
 		if v.ID == id || v.Error != "" {
 			continue
 		}
-		if err := s.keepVariant(v, fmt.Sprintf("안 %d · %s", v.ID, label)); err != nil {
+		if err := s.keepVariant(v, history.Note{Kind: kindVariant, Text: text, Ref: v.ID}); err != nil {
 			return err
 		}
 	}
-	if err := s.keepVariant(run.variants[id-1], fmt.Sprintf("안 %d 선택 · %s", id, label)); err != nil {
+	if err := s.keepVariant(run.variants[id-1], history.Note{Kind: kindChosen, Text: text, Ref: id}); err != nil {
 		return err
 	}
 	s.pending = nil
 	return s.variants.Clear()
 }
 
-func (s *Service) keepVariant(v Variant, label string) error {
+func (s *Service) keepVariant(v Variant, note history.Note) error {
 	if err := s.variants.Apply(v.ID); err != nil {
 		return err
 	}
-	_, err := s.timeline.Keep(label, v.Page)
+	_, err := s.timeline.Keep(note, v.Page)
 	return err
 }
 

@@ -8,7 +8,7 @@ import (
 	"hunsu/internal/project"
 )
 
-var ErrNothingToUndo = errors.New("되돌릴 것이 없다")
+var ErrNothingToUndo = errors.New("nothing to undo")
 
 const (
 	dir           = "history"

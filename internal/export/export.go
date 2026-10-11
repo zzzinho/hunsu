@@ -14,7 +14,7 @@ import (
 	"hunsu/internal/project"
 )
 
-var ErrNotPage = errors.New("페이지가 아니다")
+var ErrNotPage = errors.New("not a page")
 
 var (
 	stylesheetLink = regexp.MustCompile(`(?i)<link\b[^>]*\bhref\s*=\s*["']?(?:\./)?design\.css["']?[^>]*>`)

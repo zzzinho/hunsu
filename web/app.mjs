@@ -6,7 +6,8 @@ import { createFrameTools } from './frame.mjs';
 import { toolForKey } from './tools.mjs';
 import { replaceText } from './textedit.mjs';
 import { exportURL, filenameOf } from './download.mjs';
-import { timeText } from './versions.mjs';
+import { timeText, versionLabel } from './versions.mjs';
+import { errorMessage, translatePage, translator } from './i18n.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
@@ -17,7 +18,6 @@ const openPath = $('#open-path');
 const status = $('#status');
 const promptForm = $('#prompt');
 const promptInput = promptForm.elements.prompt;
-const defaultPlaceholder = promptInput.placeholder;
 const editor = CodeMirror($('#editor'), {
   theme: 'hunsu',
   lineNumbers: true,
@@ -40,6 +40,7 @@ let panels = stored('hunsu.panels', { files: true, source: true });
 let sizes = stored('hunsu.sizes', DEFAULT_SIZES);
 let zoom = stored('hunsu.zoom', 1);
 let deviceWidth = null;
+let t = translator(stored('hunsu.lang', 'en'));
 
 function stored(key, fallback) {
   try {
@@ -61,7 +62,7 @@ const fileURL = (path) => `/api/file?path=${encodeURIComponent(path)}`;
 
 async function request(url, options) {
   const res = await fetch(url, options);
-  if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+  if (!res.ok) throw new Error(errorMessage(await res.text(), t));
   status.textContent = '';
   return res;
 }
@@ -70,7 +71,7 @@ const readFile = async (path) => (await request(fileURL(path))).text();
 
 function fileButton(path, onClick, missing = false) {
   const button = document.createElement('button');
-  button.textContent = path;
+  button.textContent = missing ? `${path} ${t('files.create')}` : path;
   button.classList.toggle('missing', missing);
   button.setAttribute('aria-current', path === state.open);
   button.onclick = onClick;
@@ -122,7 +123,7 @@ function acceptFileDrop(target) {
 }
 
 async function open(path) {
-  if (!editor.isClean() && !confirm('저장하지 않은 변경을 버릴까요?')) return;
+  if (!editor.isClean() && !confirm(t('confirm.discard'))) return;
   const text = await readFile(path);
   const previousPreview = state.preview;
   state = openFile(state, path);
@@ -140,10 +141,12 @@ async function open(path) {
   await refreshList();
 }
 
+const modelLabel = (model, isDefault) => [model.label, model.fast && t('model.fast'), isDefault && t('model.default')].filter(Boolean).join(' ');
+
 async function loadModels() {
   const models = await (await request('/api/models')).json();
   const select = promptForm.elements.model;
-  select.replaceChildren(...models.map((model, i) => new Option(i === 0 ? `${model.label} (기본)` : model.label, model.id)));
+  select.replaceChildren(...models.map((model, i) => new Option(modelLabel(model, i === 0), model.id)));
   select.hidden = models.length === 0;
 }
 
@@ -205,14 +208,14 @@ async function editText(edit) {
   const next = replaceText(await readFile(page), edit, decodeHTML);
   if (next === null) {
     frame.contentWindow.location.reload();
-    throw new Error('원본에서 이 문구를 찾지 못해 반영하지 않았습니다. 페이지 JS 가 만든 문구일 수 있습니다');
+    throw new Error(t('textEdit.notFound'));
   }
   await request(fileURL(page), { method: 'PUT', body: next });
 }
 
 async function download(kind) {
   $('#export').open = false;
-  status.textContent = '내보내는 중…';
+  status.textContent = t('export.running');
   const res = await request(exportURL(kind, state.preview, deviceWidth));
   const link = document.createElement('a');
   link.href = URL.createObjectURL(await res.blob());
@@ -230,16 +233,16 @@ function versionItem(version) {
     thumb.alt = '';
     thumb.loading = 'lazy';
   } else {
-    thumb.textContent = version.page || '썸네일 없음';
+    thumb.textContent = version.page || t('versions.noThumb');
   }
   const title = document.createElement('strong');
-  title.textContent = `v${version.id} · ${version.label}`;
+  title.textContent = `v${version.id} · ${versionLabel(version, t)}`;
   const meta = document.createElement('span');
   meta.className = 'meta';
-  meta.textContent = [timeText(new Date(version.time), new Date()), version.page].filter(Boolean).join(' · ');
+  meta.textContent = [timeText(new Date(version.time), new Date(), t), version.page].filter(Boolean).join(' · ');
   const restore = document.createElement('button');
   restore.type = 'button';
-  restore.textContent = '복원';
+  restore.textContent = t('versions.restore');
   restore.disabled = Boolean(running);
   restore.onclick = () => noteErrors(restoreVersion(version.id));
   item.append(thumb, title, meta, restore);
@@ -258,9 +261,9 @@ async function showVersions() {
 async function restoreVersion(id) {
   if (!editor.isClean()) await save();
   await request(`/api/versions/restore?id=${id}&page=${encodeURIComponent(state.preview ?? '')}`, { method: 'POST' });
-  addMessage('progress', `v${id} 으로 복원했습니다`);
+  addMessage('progress', t('versions.restored', { id }));
   await Promise.all([showVersions(), openExisting()]);
-  $('#version-note').textContent = `v${id} 으로 복원했습니다`;
+  $('#version-note').textContent = t('versions.restored', { id });
 }
 
 async function reloadEditor(path) {
@@ -302,11 +305,11 @@ function addProgress() {
   const step = document.createElement('span');
   const elapsed = document.createElement('span');
   step.setAttribute('aria-live', 'polite');
-  step.textContent = '요청 보내는 중';
+  step.textContent = t('step.sending');
   elapsed.className = 'elapsed';
   item.append(step, elapsed);
   const started = Date.now();
-  const tick = () => { elapsed.textContent = elapsedText(Date.now() - started); };
+  const tick = () => { elapsed.textContent = elapsedText(Date.now() - started, t); };
   tick();
   const timer = setInterval(tick, 1000);
   return {
@@ -328,7 +331,7 @@ function setRunning(controller) {
   promptForm.elements.variants.disabled = busy;
   $('#undo').disabled = busy;
   $('#new-chat').disabled = busy;
-  $('#send').textContent = busy ? '취소' : '보내기';
+  $('#send').textContent = busy ? t('cancel') : t('send');
 }
 
 async function* streamEvents(res) {
@@ -345,7 +348,7 @@ async function sendPrompt(prompt) {
   if (!editor.isClean()) await save();
   const count = Number(promptForm.elements.variants.value);
   setRunning(new AbortController());
-  addMessage('user', count > 1 ? `${prompt} (${count}안 비교)` : prompt);
+  addMessage('user', count > 1 ? t('variants.request', { prompt, count }) : prompt);
   const progress = addProgress();
   const steps = {};
   let created = null;
@@ -359,28 +362,28 @@ async function sendPrompt(prompt) {
     });
     for await (const event of streamEvents(res)) {
       if (event.variant) {
-        steps[event.variant] = stepText(event) ?? steps[event.variant];
-        progress.show(variantsText(steps));
+        steps[event.variant] = stepText(event, t) ?? steps[event.variant];
+        progress.show(variantsText(steps, t));
       } else if (event.kind === 'reply') addMessage('assistant', event.text);
       else if (event.kind === 'created') created ??= event.file;
       else {
-        progress.show(stepText(event));
+        progress.show(stepText(event, t));
         ended ||= event.kind === 'end';
       }
     }
     progress.finish();
   } catch (error) {
-    progress.finish(error.name === 'AbortError' ? '취소했습니다' : `오류: ${error.message}`);
+    progress.finish(error.name === 'AbortError' ? t('message.canceled') : t('message.error', { message: error.message }));
   } finally {
     setRunning(null);
     if (created) await open(created);
     else await openExisting();
   }
   if (count > 1 && ended) {
-    const item = addMessage('progress', `비교안 ${count}개를 만들었습니다`);
+    const item = addMessage('progress', t('variants.made', { count }));
     const reopen = document.createElement('button');
     reopen.type = 'button';
-    reopen.textContent = '비교안 보기';
+    reopen.textContent = t('variants.show');
     reopen.onclick = () => showVariants();
     item.append(reopen);
     await showVariants();
@@ -390,7 +393,7 @@ async function sendPrompt(prompt) {
 function variantColumn(variant) {
   const item = document.createElement('li');
   const title = document.createElement('strong');
-  title.textContent = `안 ${variant.id}`;
+  title.textContent = t('variants.take', { id: variant.id });
   const reply = document.createElement('p');
   reply.className = variant.error ? 'reply error' : 'reply';
   reply.textContent = variant.error || variant.reply;
@@ -399,7 +402,7 @@ function variantColumn(variant) {
     const shot = document.createElement('div');
     shot.className = 'shot';
     const preview = document.createElement('iframe');
-    preview.title = `안 ${variant.id} 미리보기`;
+    preview.title = t('variants.preview', { id: variant.id });
     preview.src = `/variant/${variant.id}/${encodeURIComponent(variant.page)}`;
     shot.append(preview);
     item.append(shot);
@@ -407,7 +410,7 @@ function variantColumn(variant) {
   const choose = document.createElement('button');
   choose.type = 'button';
   choose.className = 'primary';
-  choose.textContent = '이 안 고르기';
+  choose.textContent = t('variants.pick');
   choose.disabled = Boolean(variant.error);
   choose.onclick = () => noteVariantErrors(chooseVariant(variant));
   item.append(choose);
@@ -429,7 +432,7 @@ function fitVariantFrames() {
 async function showVariants() {
   const variants = await (await request('/api/variants')).json();
   if (!variants.length) {
-    status.textContent = '고를 비교안이 없습니다';
+    status.textContent = t('variants.none');
     return;
   }
   $('#variant-note').textContent = '';
@@ -442,7 +445,7 @@ async function chooseVariant(variant) {
   if (!editor.isClean()) await save();
   await request(`/api/variants/choose?id=${variant.id}&page=${encodeURIComponent(state.preview ?? '')}`, { method: 'POST' });
   $('#variants-dialog').close();
-  addMessage('progress', `안 ${variant.id} 을 골랐습니다. 나머지 안은 버전에 남았습니다`);
+  addMessage('progress', t('variants.picked', { id: variant.id }));
   await open(variant.page);
 }
 
@@ -451,9 +454,21 @@ function showSelection(next, picked) {
   const chip = $('#selection');
   chip.hidden = !next;
   chip.querySelector('code').textContent = next?.selector ?? '';
-  promptInput.placeholder = next ? '선택한 요소를 어떻게 바꿀까요?' : defaultPlaceholder;
+  showPlaceholder();
   if (picked) promptInput.focus();
   reportUI();
+}
+
+const showPlaceholder = () => {
+  promptInput.placeholder = t(selection ? 'prompt.placeholderSelected' : 'prompt.placeholder');
+};
+
+function applyLanguage() {
+  document.documentElement.lang = t.lang;
+  translatePage(document, t);
+  $('#lang').value = t.lang;
+  showPlaceholder();
+  $('#send').textContent = running ? t('cancel') : t('send');
 }
 
 function setTool(tool) {
@@ -591,7 +606,7 @@ $('#variants-close').onclick = () => $('#variants-dialog').close();
 $('#variants-discard').onclick = () => noteVariantErrors((async () => {
   await request('/api/variants/discard', { method: 'POST' });
   $('#variants-dialog').close();
-  addMessage('progress', '비교안을 버렸습니다');
+  addMessage('progress', t('variants.discarded'));
 })());
 $('#versions-open').onclick = async () => {
   await showVersions();
@@ -603,7 +618,7 @@ $('#version-save').onclick = () => noteErrors((async () => {
   const res = await request(`/api/versions?page=${encodeURIComponent(state.preview ?? '')}`, { method: 'POST' });
   const { saved } = await res.json();
   await showVersions();
-  $('#version-note').textContent = saved ? '지금 상태를 저장했습니다' : '직전 버전과 같아서 남기지 않았습니다';
+  $('#version-note').textContent = saved ? t('versions.saved') : t('versions.same');
 })());
 $('.upload input').onchange = async ({ target }) => {
   await upload(target.files);
@@ -631,16 +646,23 @@ promptInput.onkeydown = (event) => {
 };
 $('#undo').onclick = async () => {
   await request('/api/undo', { method: 'POST' });
-  addMessage('progress', '마지막 요청 전으로 되돌렸습니다');
+  addMessage('progress', t('message.undone'));
   await openExisting();
 };
 $('#new-chat').onclick = async () => {
   await request('/api/chat/reset', { method: 'POST' });
   $('#messages').replaceChildren();
-  addMessage('progress', '새 대화를 시작했습니다');
+  addMessage('progress', t('message.newChat'));
+};
+$('#lang').onchange = async ({ target }) => {
+  t = translator(target.value);
+  store('hunsu.lang', t.lang);
+  applyLanguage();
+  await Promise.all([loadModels(), refreshList()]);
 };
 window.onunhandledrejection = ({ reason }) => { status.textContent = reason.message; };
 
+applyLanguage();
 applyLayout();
 listenCommands();
 await Promise.all([loadModels(), openExisting()]);
