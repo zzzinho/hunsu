@@ -13,9 +13,6 @@ import (
 	"os/exec"
 )
 
-// 아주 긴 페이지는 LLM 에 보낼 때 어차피 줄어들어 알아볼 수 없다. 위에서부터 이만큼만 찍는다.
-const maxHeight = 4000
-
 var chromePaths = []string{
 	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 	"/Applications/Chromium.app/Contents/MacOS/Chromium",
@@ -39,7 +36,8 @@ type Chrome struct {
 	Base string
 }
 
-func (c Chrome) Screenshot(ctx context.Context, page string, width int) ([]byte, error) {
+// Screenshot 은 page 를 width 너비로 렌더해 위에서부터 maxHeight 까지 PNG 로 찍는다.
+func (c Chrome) Screenshot(ctx context.Context, page string, width, maxHeight int) ([]byte, error) {
 	dir, err := os.MkdirTemp("", "hunsu-chrome-")
 	if err != nil {
 		return nil, err
@@ -73,14 +71,14 @@ func (c Chrome) Screenshot(ctx context.Context, page string, width int) ([]byte,
 		cmd.Process.Kill()
 		cmd.Wait()
 	}()
-	png, err := capture(&devtools{w: writer, r: bufio.NewReader(reader)}, c.Base+url.PathEscape(page), width)
+	png, err := capture(&devtools{w: writer, r: bufio.NewReader(reader)}, c.Base+url.PathEscape(page), width, maxHeight)
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 	return png, err
 }
 
-func capture(d *devtools, pageURL string, width int) ([]byte, error) {
+func capture(d *devtools, pageURL string, width, maxHeight int) ([]byte, error) {
 	var target struct {
 		TargetID string `json:"targetId"`
 	}
@@ -128,7 +126,7 @@ func capture(d *devtools, pageURL string, width int) ([]byte, error) {
 	var shot struct {
 		Data []byte `json:"data"`
 	}
-	clip := map[string]any{"x": 0, "y": 0, "width": width, "height": math.Min(math.Ceil(metrics.CSSContentSize.Height), maxHeight), "scale": 1}
+	clip := map[string]any{"x": 0, "y": 0, "width": width, "height": math.Min(math.Ceil(metrics.CSSContentSize.Height), float64(maxHeight)), "scale": 1}
 	err := d.call("Page.captureScreenshot", map[string]any{"format": "png", "captureBeyondViewport": true, "clip": clip}, &shot)
 	return shot.Data, err
 }

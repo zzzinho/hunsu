@@ -76,7 +76,7 @@ func run(dir string, port int, openBrowser bool) error {
 	if renderer != nil {
 		mux.Handle("/mcp/render", mcp.RequireToken(token, mcp.NewServer(info, "", mcptools.Render(p, renderer)...)))
 	}
-	mux.Handle("/", server.New(p, assistant, hub, web, 500*time.Millisecond))
+	mux.Handle("/", server.New(p, assistant, hub, web, 500*time.Millisecond, renderer))
 
 	fmt.Printf("hunsu: %s 를 %s 에서 엽니다\n", p.Dir(), url)
 	fmt.Printf("MCP 서버: %smcp (헤더 Authorization: Bearer %s). 클라이언트별 등록 방법은 README 참고\n", url, token)

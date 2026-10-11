@@ -12,6 +12,7 @@ A local, HTML-native design tool: edit pages by hand or have an LLM build and re
 - **Assets**: drop in images and fonts; the LLM uses them in pages.
 - **External agents (MCP)**: MCP clients such as Claude Code or Codex see your selection and edit files directly.
 - **Undo**: roll back a whole request in one step.
+- **Export**: folder ZIP, single-file HTML per page, PNG.
 
 The UI is currently Korean only; on-screen labels are given in parentheses.
 
@@ -72,6 +73,16 @@ Both are pinned at the top of the file panel (click to create if missing) and se
 **Assets**
 
 Drop images (png, jpg, gif, webp, avif, svg) or fonts (woff, woff2, ttf, otf) anywhere on the screen, or pick them with Upload (이미지·폰트 올리기), to save them in `assets/`. Up to 10 MB per file; existing names are rejected. The list is sent to the LLM with every request. Assets are not part of undo; delete them in Finder.
+
+**Export**
+
+Download from Export (내보내기) in the toolbar.
+
+| Item | Contents |
+|---|---|
+| This page · single HTML file | HTML with `design.css` and assets inlined. Opens the same anywhere |
+| This page · PNG | Full page at the width you are viewing (mobile 390px, desktop 1280px). Needs Chrome |
+| Whole folder · ZIP | Design system, pages, assets (without `.hunsu/`) |
 
 **Edit directly**: edit in the source editor and press ⌘S. Edits from other editors show up within 0.5 s and are reported to the LLM on the next request.
 
@@ -142,6 +153,7 @@ go test ./... && node --test web/
 | `internal/claude` | PoC provider (`claude -p`) |
 | `internal/history` | Snapshots and undo |
 | `internal/render` | Headless Chrome screenshots |
+| `internal/export` | ZIP and single-file HTML export |
 | `internal/chat` | Request handling: one run at a time, prompt assembly, conversation |
 | `internal/server` | HTTP API for the browser |
 | `internal/ui` | Browser screen state and commands |

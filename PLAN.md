@@ -194,7 +194,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 - [x] 6. 에셋: `assets/`(유일한 하위 폴더)에 이미지(png·jpg·gif·webp·avif·svg)·폰트(woff·woff2·ttf·otf)를 끌어다 놓거나 골라서 올린다. 파일당 10MB, 같은 이름은 거부. 목록을 요청마다 프롬프트 끝과 `get_context` 에. LLM 은 에셋을 참조만 하고 만들지 않으므로 되돌리기 스냅샷에 넣지 않는다. 지우기는 Finder 에서
 - [x] 7. 텍스트 직접 수정: 선택 도구로 텍스트만 가진 요소를 더블클릭해 고치고, Enter·바깥 클릭으로 반영, Esc 로 취소. 원본에서 같은 문구 중 몇 번째인지로 위치를 찾고, 찾지 못하면(페이지 JS 가 만든 문구 등) 반영하지 않고 알린다. 기존 파일 저장 API 를 쓴다. 편집기 저장처럼 되돌리기 스냅샷은 없다
 - [x] 8. 렌더러: headless Chrome 스크린샷. `screenshot` MCP 도구를 내장 provider 와 외부 에이전트가 함께 쓴다. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 기능을 끈다
-- [ ] 9. 내보내기: 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용)
+- [x] 9. 내보내기: 폴더 ZIP(디자인 시스템·페이지·에셋, `.hunsu/` 제외), 페이지별 단일 HTML(`design.css` 링크를 `<style>` 로, 에셋 경로를 data URI 로), PNG(렌더러, 높이 16,000px 까지). 화면 막대의 [내보내기] 메뉴에서 받는다. Chrome 이 없으면 PNG 는 이유를 알린다
 - [ ] 10. 버저닝: 요청마다 자동 + [버전 저장]. 시각·요청·썸네일 타임라인, 아무 버전으로 복원(복원도 새 버전). 되돌리기는 이전 버전으로. MCP `undo` 는 지금 브라우저 요청 스냅샷도 함께 되돌리므로 설명을 맞춘다
 - [ ] 11. Codex provider: `codex exec --json`. provider 선택, provider 별 대화 ID
 - [ ] 12. 비교안(옵션): 한 요청에 2~3안, 나란히 보기, 고른 안이 페이지가 되고 나머지는 버전에 남는다

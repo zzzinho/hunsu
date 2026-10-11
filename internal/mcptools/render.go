@@ -1,7 +1,6 @@
 package mcptools
 
 import (
-	"cmp"
 	"context"
 	"encoding/json"
 	"errors"
@@ -10,20 +9,18 @@ import (
 
 	"hunsu/internal/mcp"
 	"hunsu/internal/project"
+	"hunsu/internal/render"
 )
 
 const (
-	defaultWidth = 1280
-	minWidth     = 320
-	maxWidth     = 2560
-	shotTimeout  = 30 * time.Second
+	shotTimeout = 30 * time.Second
+	// 아주 긴 페이지는 LLM 에 보낼 때 어차피 줄어들어 알아볼 수 없다. 위에서부터 이만큼만 찍는다.
+	shotHeight = 4000
 )
-
-var errWidth = fmt.Errorf("너비는 %d~%dpx 이다", minWidth, maxWidth)
 
 // Renderer 는 디자인 페이지를 PNG 로 찍는다.
 type Renderer interface {
-	Screenshot(ctx context.Context, page string, width int) ([]byte, error)
+	Screenshot(ctx context.Context, page string, width, maxHeight int) ([]byte, error)
 }
 
 var shotArgs = map[string]any{
@@ -58,16 +55,16 @@ func screenshot(ctx context.Context, p *project.Project, renderer Renderer, args
 	if err := json.Unmarshal(args, &in); err != nil {
 		return mcp.Result{}, err
 	}
-	width := cmp.Or(in.Width, defaultWidth)
-	if width < minWidth || width > maxWidth {
-		return mcp.Result{}, errWidth
+	width, err := render.Width(in.Width)
+	if err != nil {
+		return mcp.Result{}, err
 	}
 	if err := requirePage(p, in.Page); err != nil {
 		return mcp.Result{}, err
 	}
 	ctx, cancel := context.WithTimeout(ctx, shotTimeout)
 	defer cancel()
-	png, err := renderer.Screenshot(ctx, in.Page, width)
+	png, err := renderer.Screenshot(ctx, in.Page, width, shotHeight)
 	if errors.Is(err, context.DeadlineExceeded) {
 		err = fmt.Errorf("%s 이 %s 안에 다 그려지지 않았다", in.Page, shotTimeout)
 	}

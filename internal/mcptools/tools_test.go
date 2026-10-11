@@ -24,7 +24,7 @@ func (idleProvider) Run(context.Context, llm.Request, func(llm.Event)) error { r
 
 type fakeRenderer struct{}
 
-func (fakeRenderer) Screenshot(_ context.Context, page string, width int) ([]byte, error) {
+func (fakeRenderer) Screenshot(_ context.Context, page string, width, _ int) ([]byte, error) {
 	return fmt.Appendf(nil, "%s@%d", page, width), nil
 }
 
@@ -116,12 +116,6 @@ func TestTools(t *testing.T) {
 		{"screenshot 은 페이지를 요청한 너비로 렌더한 이미지를 돌려준다",
 			func(f *fixture) string { return f.call("screenshot", `{"page":"a.html","width":390}`) },
 			"image:a.html@390 / a.html, 너비 390px"},
-		{"screenshot 의 너비를 정하지 않으면 1280px 로 찍는다",
-			func(f *fixture) string { return f.call("screenshot", `{"page":"a.html"}`) },
-			"image:a.html@1280 / a.html, 너비 1280px"},
-		{"screenshot 은 320~2560px 너비만 받는다",
-			func(f *fixture) string { return f.call("screenshot", `{"page":"a.html","width":100}`) },
-			"error: 너비는 320~2560px 이다"},
 		{"screenshot 은 없는 페이지를 찍지 않는다",
 			func(f *fixture) string { return f.call("screenshot", `{"page":"none.html"}`) },
 			"error: none.html 은 페이지가 아니다. get_context 의 pages 중에서 고른다"},

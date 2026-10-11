@@ -68,6 +68,28 @@ func fakeChrome(mode, height string) {
 	}
 }
 
+func TestWidth(t *testing.T) {
+	tests := []struct {
+		name    string
+		width   int
+		want    int
+		wantErr error
+	}{
+		{"너비를 정하지 않으면 1280px 이다", 0, 1280, nil},
+		{"정한 너비를 그대로 쓴다", 390, 390, nil},
+		{"320px 보다 좁으면 거부한다", 100, 0, render.ErrWidth},
+		{"2560px 보다 넓으면 거부한다", 4000, 0, render.ErrWidth},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := render.Width(tt.width)
+			if got != tt.want || !errors.Is(err, tt.wantErr) {
+				t.Errorf("Width(%d) = %d, %v; want %d, %v", tt.width, got, err, tt.want, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestChrome_Screenshot(t *testing.T) {
 	tests := []struct {
 		name    string
@@ -76,14 +98,15 @@ func TestChrome_Screenshot(t *testing.T) {
 		height  string
 		page    string
 		width   int
+		max     int
 		want    string
 		wantErr error
 	}{
-		{"페이지를 요청한 너비로 렌더해 PNG 로 돌려준다", os.Args[0], "ok", "1000", "a.html", 390, "http://hunsu.test/p/a.html 390x1000", nil},
-		{"파일 이름의 공백은 URL 에 맞게 바꾼다", os.Args[0], "ok", "1000", "my page.html", 1280, "http://hunsu.test/p/my%20page.html 1280x1000", nil},
-		{"페이지가 4000px 보다 길면 위에서 4000px 까지 찍는다", os.Args[0], "ok", "9000", "a.html", 1280, "http://hunsu.test/p/a.html 1280x4000", nil},
-		{"페이지가 다 불러와지지 않으면 제한 시간에 멈춘다", os.Args[0], "hang", "1000", "a.html", 1280, "", context.DeadlineExceeded},
-		{"Chrome 을 실행할 수 없으면 실패를 알린다", "/없는/chrome", "ok", "1000", "a.html", 1280, "", os.ErrNotExist},
+		{"페이지를 요청한 너비로 렌더해 PNG 로 돌려준다", os.Args[0], "ok", "1000", "a.html", 390, 4000, "http://hunsu.test/p/a.html 390x1000", nil},
+		{"파일 이름의 공백은 URL 에 맞게 바꾼다", os.Args[0], "ok", "1000", "my page.html", 1280, 4000, "http://hunsu.test/p/my%20page.html 1280x1000", nil},
+		{"페이지가 최대 높이보다 길면 위에서 최대 높이까지 찍는다", os.Args[0], "ok", "9000", "a.html", 1280, 4000, "http://hunsu.test/p/a.html 1280x4000", nil},
+		{"페이지가 다 불러와지지 않으면 제한 시간에 멈춘다", os.Args[0], "hang", "1000", "a.html", 1280, 4000, "", context.DeadlineExceeded},
+		{"Chrome 을 실행할 수 없으면 실패를 알린다", "/없는/chrome", "ok", "1000", "a.html", 1280, 4000, "", os.ErrNotExist},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -91,7 +114,7 @@ func TestChrome_Screenshot(t *testing.T) {
 			t.Setenv("HUNSU_FAKE_HEIGHT", tt.height)
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
-			got, err := render.Chrome{Path: tt.chrome, Base: "http://hunsu.test/p/"}.Screenshot(ctx, tt.page, tt.width)
+			got, err := render.Chrome{Path: tt.chrome, Base: "http://hunsu.test/p/"}.Screenshot(ctx, tt.page, tt.width, tt.max)
 			if string(got) != tt.want || !errors.Is(err, tt.wantErr) {
 				t.Errorf("Screenshot(%q, %d) = %q, %v; want %q, %v", tt.page, tt.width, got, err, tt.want, tt.wantErr)
 			}
