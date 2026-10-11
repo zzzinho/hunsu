@@ -6,14 +6,14 @@ import (
 	"hunsu/internal/llm"
 )
 
-func Args(r llm.Request, tools *llm.MCPServer) []string {
+func Args(r llm.Request) []string {
 	// 격리하지 않으면 사용자 설정·hook·MCP 를 불러와 2배 느리고 10배 비싸다 (PLAN.md 11).
 	// --safe-mode 는 --mcp-config 로 넘긴 서버까지 끈다. 도구를 붙일 때는 --restricted 만으로 격리한다.
 	args := []string{"-p"}
-	if tools == nil {
+	if r.Tools == nil {
 		args = append(args, "--safe-mode", "--strict-mcp-config")
 	} else {
-		args = append(args, "--strict-mcp-config", "--mcp-config", mcpConfig(tools), "--allowedTools", "mcp__"+tools.Name)
+		args = append(args, "--strict-mcp-config", "--mcp-config", mcpConfig(r.Tools), "--allowedTools", "mcp__"+r.Tools.Name)
 	}
 	args = append(args,
 		"--restricted", "--tools", "Read,Edit,Write", "--permission-mode", "acceptEdits",

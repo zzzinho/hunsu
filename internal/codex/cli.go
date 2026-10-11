@@ -14,8 +14,7 @@ import (
 )
 
 type CLI struct {
-	Path  string
-	Tools *llm.MCPServer
+	Path string
 }
 
 // 첫 번째가 기본이다. 2026-10 에 ChatGPT 로그인으로 쓸 수 있음을 확인한 모델이다 (PLAN.md 11).
@@ -27,7 +26,7 @@ func (CLI) Models() []llm.Model { return slices.Clone(models) }
 
 func (c CLI) Run(ctx context.Context, req llm.Request, emit func(llm.Event)) error {
 	var stderr bytes.Buffer
-	cmd := exec.CommandContext(ctx, c.Path, Args(req, c.Tools)...)
+	cmd := exec.CommandContext(ctx, c.Path, Args(req)...)
 	cmd.Dir = req.Dir
 	cmd.Stdin = strings.NewReader(req.Prompt)
 	var decoder Decoder

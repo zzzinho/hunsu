@@ -63,7 +63,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 func (f *fixture) restart() {
-	svc, err := chat.New(f.project, f.runner, nil)
+	svc, err := chat.New(f.project, f.runner, chat.Options{Tools: hunsuTools})
 	f.must(err)
 	f.svc = svc
 }
@@ -76,6 +76,8 @@ func (f *fixture) send(turn chat.Turn) string {
 	}
 	return strings.Join(events, " ")
 }
+
+var hunsuTools = &llm.MCPServer{Name: "hunsu", URL: "http://127.0.0.1:7777/mcp/render", Token: "t"}
 
 func (f *fixture) lastRequest() llm.Request { return f.runner.requests[len(f.runner.requests)-1] }
 
@@ -235,6 +237,12 @@ func TestService(t *testing.T) {
 				return fmt.Sprint(f.runner.requests[0].SystemPrompt == f.lastRequest().SystemPrompt)
 			},
 			"true"},
+		{"hunsu 가 준비한 도구를 요청에 건넨다",
+			func(f *fixture) string {
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.lastRequest().Tools.URL
+			},
+			hunsuTools.URL},
 		{"고른 모델로 보낸다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "고쳐", Model: "slow"})

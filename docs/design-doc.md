@@ -183,7 +183,7 @@ type Provider interface {
 }
 // Request: Dir, Prompt, SystemPrompt, SessionID(비면 새 대화), Model
 // Event:   start(SessionID) · think · read(file) · write(file, size) · answer · tool(text) · retry · reply(text) · fail(text)
-// MCPServer: provider 를 만들 때 건네는 도구 서버 (Name, URL, Token)
+// Request.Tools: 요청마다 건네는 도구 서버 MCPServer(Name, URL, Token). nil 이면 도구 없음
 ```
 
 - 대화 ID 는 provider 가 `start` 로 알리고 hunsu 가 다음 `Request.SessionID` 로 돌려준다. hunsu 는 그 값을 해석하지 않는다.

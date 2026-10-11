@@ -6,7 +6,7 @@ import (
 	"hunsu/internal/llm"
 )
 
-func Args(r llm.Request, tools *llm.MCPServer) []string {
+func Args(r llm.Request) []string {
 	args := []string{"exec"}
 	if r.SessionID != "" {
 		args = append(args, "resume")
@@ -18,11 +18,11 @@ func Args(r llm.Request, tools *llm.MCPServer) []string {
 		"-c", `sandbox_mode="workspace-write"`,
 		"-c", "developer_instructions="+tomlString(r.SystemPrompt),
 	)
-	if tools != nil {
-		server := "mcp_servers." + tools.Name
+	if r.Tools != nil {
+		server := "mcp_servers." + r.Tools.Name
 		args = append(args,
-			"-c", server+".url="+tomlString(tools.URL),
-			"-c", server+".http_headers={Authorization="+tomlString("Bearer "+tools.Token)+"}",
+			"-c", server+".url="+tomlString(r.Tools.URL),
+			"-c", server+".http_headers={Authorization="+tomlString("Bearer "+r.Tools.Token)+"}",
 			// exec 는 승인을 물을 수 없어서, 승인하지 않은 MCP 도구 호출은 거부된다.
 			"-c", server+`.default_tools_approval_mode="approve"`,
 		)

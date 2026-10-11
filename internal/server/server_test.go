@@ -47,7 +47,7 @@ func newServer(t *testing.T) (http.Handler, string, *ui.Hub) {
 func newServerWith(t *testing.T, renderer server.Renderer) (http.Handler, string, *ui.Hub) {
 	t.Helper()
 	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "notes.txt": "notes.txt"})
-	svc, err := chat.New(p, startProvider{}, nil)
+	svc, err := chat.New(p, startProvider{}, chat.Options{})
 	if err != nil {
 		t.Fatal(err)
 	}
