@@ -15,6 +15,7 @@ import (
 
 	"hunsu/internal/chat"
 	"hunsu/internal/llm"
+	"hunsu/internal/project"
 	"hunsu/internal/project/projecttest"
 	"hunsu/internal/server"
 	"hunsu/internal/ui"
@@ -59,6 +60,9 @@ func TestServer_API(t *testing.T) {
 		{"편집 대상이 아닌 파일은 거부한다", "GET", "/api/file?path=notes.txt", "", 403, "", ""},
 		{"없는 파일은 없다고 알린다", "GET", "/api/file?path=none.html", "", 404, "", ""},
 		{"이미 있는 파일은 새로 만들지 않는다", "POST", "/api/file?path=page.html", "", 409, "", ""},
+		{"에셋을 올린다", "POST", "/api/assets?name=logo.png", "png", 201, "", ""},
+		{"이미지·폰트가 아닌 에셋은 거부한다", "POST", "/api/assets?name=a.js", "js", 415, "", ""},
+		{"10MB 를 넘는 에셋은 거부한다", "POST", "/api/assets?name=big.png", strings.Repeat("x", project.MaxAssetSize+1), 413, "", ""},
 		{"렌더용 프로젝트 파일은 캐시 없이 준다", "GET", "/p/page.html", "", 200, "page.html", "Cache-Control: no-store"},
 		{"채팅 요청의 진행 이벤트를 스트림으로 보낸다", "POST", "/api/chat", `{"prompt":"고쳐"}`, 200, `data: {"kind":"start"}`, "Content-Type: text/event-stream"},
 		{"빈 채팅 요청은 거부한다", "POST", "/api/chat", `{"prompt":""}`, 400, "", ""},

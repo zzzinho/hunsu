@@ -34,7 +34,7 @@ func designUpdate(current map[string][]byte, edited []string, first bool) design
 	return designSection{files: files, whole: first}
 }
 
-func userPrompt(t Turn, edited []string, design designSection) string {
+func userPrompt(t Turn, edited []string, design designSection, assets []string) string {
 	var b strings.Builder
 	if t.Page != "" {
 		fmt.Fprintf(&b, "[현재 페이지] %s\n", t.Page)
@@ -43,6 +43,9 @@ func userPrompt(t Turn, edited []string, design designSection) string {
 		fmt.Fprintf(&b, "[알림] 마지막 응답 이후 사용자가 직접 고친 파일: %s. 고치기 전에 다시 읽어라.\n", strings.Join(edited, ", "))
 	}
 	design.write(&b)
+	if len(assets) > 0 {
+		fmt.Fprintf(&b, "[에셋] %s\n", strings.Join(assets, ", "))
+	}
 	if t.Selection != nil {
 		fmt.Fprintf(&b, "[선택한 요소] %s\n%s\n", t.Selection.Selector, truncate(t.Selection.HTML, selectionLimit))
 	}

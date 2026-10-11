@@ -23,6 +23,7 @@ type Project struct {
 type Listing struct {
 	DesignSystem []Entry  `json:"designSystem"`
 	Pages        []string `json:"pages"`
+	Assets       []string `json:"assets"`
 }
 
 type Entry struct {
@@ -89,7 +90,8 @@ func (p *Project) List() (Listing, error) {
 			listing.Pages = append(listing.Pages, e.Name())
 		}
 	}
-	return listing, nil
+	listing.Assets, err = p.assets()
+	return listing, err
 }
 
 func (p *Project) Read(name string) ([]byte, error) {

@@ -34,7 +34,7 @@ func New(p *project.Project, assistant *chat.Service, hub *ui.Hub) []mcp.Tool {
 	return []mcp.Tool{
 		{
 			Name:        "get_context",
-			Description: "hunsu 에서 사용자가 보고 있는 것을 알려준다: 디자인 폴더의 절대 경로, 페이지 목록, 디자인 시스템(DESIGN.md, design.css) 내용, 브라우저에 보이는 페이지, 브라우저에서 선택한 요소(CSS 선택자와 HTML). 디자인 작업을 시작할 때와 사용자가 '이거', '선택한 것' 이라고 할 때 호출한다.",
+			Description: "hunsu 에서 사용자가 보고 있는 것을 알려준다: 디자인 폴더의 절대 경로, 페이지 목록, 사용자가 올린 에셋(이미지·폰트) 경로, 디자인 시스템(DESIGN.md, design.css) 내용, 브라우저에 보이는 페이지, 브라우저에서 선택한 요소(CSS 선택자와 HTML). 디자인 작업을 시작할 때와 사용자가 '이거', '선택한 것' 이라고 할 때 호출한다.",
 			InputSchema: noArgs,
 			Call:        func(context.Context, json.RawMessage) (string, error) { return workspaceOf(p, hub) },
 		},
@@ -66,6 +66,7 @@ func New(p *project.Project, assistant *chat.Service, hub *ui.Hub) []mcp.Tool {
 type workspace struct {
 	Folder       string            `json:"folder"`
 	Pages        []string          `json:"pages"`
+	Assets       []string          `json:"assets"`
 	DesignSystem map[string]string `json:"designSystem"`
 	CurrentPage  string            `json:"currentPage"`
 	Selection    *ui.Selection     `json:"selection"`
@@ -87,7 +88,7 @@ func workspaceOf(p *project.Project, hub *ui.Hub) (string, error) {
 	encoder := json.NewEncoder(&out)
 	// 선택한 요소의 HTML 을 에이전트가 \u003c 같은 이스케이프 없이 그대로 읽게 한다.
 	encoder.SetEscapeHTML(false)
-	err = encoder.Encode(workspace{Folder: p.Dir(), Pages: listing.Pages, DesignSystem: design, CurrentPage: state.Page, Selection: state.Selection})
+	err = encoder.Encode(workspace{Folder: p.Dir(), Pages: listing.Pages, Assets: listing.Assets, DesignSystem: design, CurrentPage: state.Page, Selection: state.Selection})
 	return string(bytes.TrimSpace(out.Bytes())), err
 }
 

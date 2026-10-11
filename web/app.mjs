@@ -75,11 +75,45 @@ function fileButton(path, onClick, missing = false) {
 }
 
 async function refreshList() {
-  const { designSystem, pages } = await (await request('/api/files')).json();
+  const { designSystem, pages, assets } = await (await request('/api/files')).json();
   $('#design-system').replaceChildren(...designSystem.map(({ path, exists }) =>
     fileButton(path, () => (exists ? open(path) : create(path)), !exists)));
   $('#pages').replaceChildren(...pages.map((path) => fileButton(path, () => open(path))));
+  $('#assets').replaceChildren(...assets.map(assetLink));
   return { pages, files: [...designSystem.filter((e) => e.exists).map((e) => e.path), ...pages] };
+}
+
+function assetLink(path) {
+  const link = document.createElement('a');
+  link.href = `/p/${path.split('/').map(encodeURIComponent).join('/')}`;
+  link.target = '_blank';
+  link.textContent = path.slice(path.indexOf('/') + 1);
+  const item = document.createElement('li');
+  item.append(link);
+  return item;
+}
+
+async function upload(files) {
+  const results = await Promise.allSettled([...files].map((file) =>
+    request(`/api/assets?name=${encodeURIComponent(file.name)}`, { method: 'POST', body: file })
+      .catch((error) => { throw new Error(`${file.name}: ${error.message}`); })));
+  await refreshList();
+  if (state.preview) frame.contentWindow.location.reload();
+  const failed = results.find((result) => result.status === 'rejected');
+  if (failed) throw failed.reason;
+}
+
+const draggingFiles = (event) => event.dataTransfer?.types.includes('Files');
+
+function acceptFileDrop(target) {
+  target.addEventListener('dragover', (event) => {
+    if (draggingFiles(event)) event.preventDefault();
+  });
+  target.addEventListener('drop', (event) => {
+    if (!draggingFiles(event)) return;
+    event.preventDefault();
+    upload(event.dataTransfer.files);
+  });
 }
 
 async function open(path) {
@@ -389,6 +423,12 @@ $$('[data-panel]').forEach((button) => {
 $$('[data-resize]').forEach(connectResizer);
 $('#selection button').onclick = () => frameTools.clear();
 document.addEventListener('keydown', handleKey);
+acceptFileDrop(document);
+frame.addEventListener('load', () => acceptFileDrop(frame.contentDocument));
+$('.upload input').onchange = async ({ target }) => {
+  await upload(target.files);
+  target.value = '';
+};
 $('#new-page').onsubmit = async (event) => {
   event.preventDefault();
   const input = event.target.elements.name;

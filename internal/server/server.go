@@ -24,6 +24,7 @@ func New(p *project.Project, c *chat.Service, hub *ui.Hub, web fs.FS, pollEvery 
 	mux.HandleFunc("GET /api/file", s.read)
 	mux.HandleFunc("PUT /api/file", s.write)
 	mux.HandleFunc("POST /api/file", s.create)
+	mux.HandleFunc("POST /api/assets", s.addAsset)
 	mux.HandleFunc("GET /api/events", s.events)
 	mux.HandleFunc("POST /api/chat", s.sendChat)
 	mux.HandleFunc("POST /api/chat/reset", s.resetChat)

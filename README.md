@@ -9,6 +9,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 렌더 화면을 보며 원본
 - **말로 만들고 고치기**: 빈 폴더에서 페이지와 디자인 시스템을 만들고, "이 버튼 더 크게" 처럼 고친다.
 - **요소 선택**: 렌더 화면에서 클릭해 "이거" 를 지정한다.
 - **디자인 시스템**: `DESIGN.md`(규칙)와 `design.css`(값)를 모든 페이지와 LLM 이 공유한다.
+- **에셋**: 이미지·폰트를 끌어다 놓으면 LLM 이 페이지에 쓴다.
 - **외부 에이전트 (MCP)**: Claude Code, Codex 같은 MCP 클라이언트가 선택한 요소를 알고 직접 고친다.
 - **되돌리기**: 요청 하나를 통째로 되돌린다.
 
@@ -61,6 +62,10 @@ go build -o hunsu .
 
 파일 패널 맨 위에 있고, 없으면 눌러서 만든다. 대화의 첫 요청과 내용이 바뀔 때 LLM 에게 전달된다.
 
+**에셋**
+
+이미지(png·jpg·gif·webp·avif·svg)·폰트(woff·woff2·ttf·otf)를 화면에 끌어다 놓거나 [이미지·폰트 올리기] 로 고르면 `assets/` 에 저장된다. 파일당 10MB, 같은 이름은 거부한다. 목록은 요청마다 LLM 에게 전달된다. 되돌리기 대상이 아니며, 지우기는 Finder 에서 한다.
+
 **직접 편집**: 에디터에서 고치고 ⌘S. 다른 에디터로 고쳐도 0.5초 안에 반영되고, 다음 요청 때 LLM 에게 알린다.
 
 ## 외부 에이전트 (MCP)
@@ -76,7 +81,7 @@ hunsu 는 표준 MCP(Streamable HTTP) 서버를 연다. 에이전트가 브라�
 
 | 도구 | 동작 |
 |---|---|
-| `get_context` | 폴더 경로, 페이지, 디자인 시스템, 보이는 페이지, 선택한 요소 |
+| `get_context` | 폴더 경로, 페이지, 에셋, 디자인 시스템, 보이는 페이지, 선택한 요소 |
 | `checkpoint` | 고치기 전 저장. 브라우저 [되돌리기] 로 복원 가능 |
 | `undo` | 마지막 checkpoint 로 복원 |
 | `open_page` | 브라우저에 페이지 열기 |
@@ -100,10 +105,11 @@ hunsu 는 표준 MCP(Streamable HTTP) 서버를 연다. 에이전트가 브라�
 designs/
   DESIGN.md, design.css   # 디자인 시스템
   *.html                  # 페이지 (루트의 .html 만)
+  assets/                 # 이미지·폰트
   .hunsu/                 # 대화 ID, 되돌리기 스냅샷
 ```
 
-페이지는 CSS·JS 를 인라인으로 쓰고 `design.css` 만 링크한다.
+페이지는 CSS·JS 를 인라인으로 쓰고 `design.css` 와 에셋만 링크한다.
 
 ## LLM provider
 
@@ -120,7 +126,7 @@ go test ./... && node --test web/
 | 경로 | 책임 |
 |---|---|
 | `main.go` | 조립: 실행 인자, provider 선택, 서버 시작 |
-| `internal/project` | 디자인 폴더 접근, 폴더 밖 차단, 템플릿, 디자인 규칙 |
+| `internal/project` | 디자인 폴더 접근, 폴더 밖 차단, 에셋, 템플릿, 디자인 규칙 |
 | `internal/watch` | 파일 변경 감지 |
 | `internal/llm` | provider 계약 |
 | `internal/claude` | PoC provider (`claude -p`) |
@@ -135,7 +141,7 @@ go test ./... && node --test web/
 
 ## 한계
 
-- 브라우저용 API 의 localhost 보호가 일부만 적용됐다 (`/mcp` 토큰, `/api/ui` 출처 검사). 나머지는 다음 마일스톤.
+- 브라우저용 API 의 localhost 보호가 일부만 적용됐다 (`/mcp` 토큰, `/api/ui` 출처 검사). 나머지는 v1 마무리 단계.
 - provider 는 Claude Code CLI 하나뿐이다.
 - 에이전트가 `open_page` 없이 만든 페이지는 다음 조작 때 목록에 나타난다.
 - macOS 만 확인했다. 루트의 `.html` 만 페이지로 다룬다.
