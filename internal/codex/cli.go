@@ -28,7 +28,9 @@ func (c CLI) Status(ctx context.Context) llm.Status {
 	if _, err := exec.LookPath(c.Path); err != nil {
 		return llm.Status{Problem: llm.NotInstalled, Fix: "brew install --cask codex"}
 	}
-	if exec.CommandContext(ctx, c.Path, "login", "status").Run() != nil {
+	cmd := exec.CommandContext(ctx, c.Path, "login", "status")
+	cmd.WaitDelay = time.Second
+	if cmd.Run() != nil {
 		return llm.Status{Problem: llm.NotLoggedIn, Fix: "codex login"}
 	}
 	return llm.Status{Ready: true}

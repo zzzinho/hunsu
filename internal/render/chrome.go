@@ -11,23 +11,32 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 )
 
-var chromePaths = []string{
-	"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-	"/Applications/Chromium.app/Contents/MacOS/Chromium",
-	"/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
-	"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser",
+var chromeApps = []string{
+	"Google Chrome.app/Contents/MacOS/Google Chrome",
+	"Chromium.app/Contents/MacOS/Chromium",
+	"Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+	"Brave Browser.app/Contents/MacOS/Brave Browser",
 }
 
-// Find 는 설치된 Chrome 계열 브라우저의 실행 파일을 찾는다. 없으면 빈 문자열이다.
+// Find 는 설치된 Chrome 계열 브라우저의 실행 파일을 찾는다. 관리자 권한 없이 ~/Applications 에 깐 것도 찾는다. 없으면 빈 문자열이다.
 func Find() string {
-	for _, path := range chromePaths {
-		if _, err := os.Stat(path); err == nil {
-			return path
+	home, _ := os.UserHomeDir()
+	for _, app := range chromeApps {
+		for _, dir := range []string{"/Applications", filepath.Join(home, "Applications")} {
+			if path := filepath.Join(dir, app); fileExists(path) {
+				return path
+			}
 		}
 	}
 	return ""
+}
+
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // Chrome 은 headless Chrome 으로 디자인 페이지를 찍는다. Base 는 페이지 URL 의 앞부분이다.

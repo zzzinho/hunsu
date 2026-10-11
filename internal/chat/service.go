@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"hunsu/internal/history"
 	"hunsu/internal/llm"
@@ -94,7 +95,12 @@ type ProviderStatus struct {
 	llm.Status
 }
 
+// 상태 확인 CLI 가 키체인 창이나 네트워크에서 멈춰도 오래 기다리지 않는다.
+const statusTimeout = 5 * time.Second
+
 func (s *Service) Status(ctx context.Context) ProviderStatus {
+	ctx, cancel := context.WithTimeout(ctx, statusTimeout)
+	defer cancel()
 	return ProviderStatus{Provider: s.llm.Name(), Status: s.llm.Status(ctx)}
 }
 

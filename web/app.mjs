@@ -175,15 +175,6 @@ function reportUI() {
   }).catch(() => {});
 }
 
-function listenCommands() {
-  const commands = new EventSource('/api/ui/commands');
-  commands.onopen = reportUI;
-  commands.onmessage = ({ data }) => {
-    const command = JSON.parse(data);
-    if (command.kind === 'open') open(command.page);
-  };
-}
-
 async function openExisting() {
   const { pages, files } = await refreshList();
   const previewGone = state.preview && !pages.includes(state.preview);
@@ -301,11 +292,16 @@ function watch() {
   events?.close();
   const query = new URLSearchParams(watchList(state).map((path) => ['path', path]));
   events = new EventSource(`/api/events?${query}`);
-  events.onmessage = ({ data: changed }) => {
+  events.onopen = reportUI;
+  events.addEventListener('change', ({ data: changed }) => {
     const reaction = reactionTo(changed, state, !editor.isClean());
     if (reaction.preview && state.preview) frame.contentWindow.location.reload();
     if (reaction.editor) reloadEditor(changed).catch(() => {});
-  };
+  });
+  events.addEventListener('command', ({ data }) => {
+    const command = JSON.parse(data);
+    if (command.kind === 'open') open(command.page);
+  });
 }
 
 function showDirty() {
@@ -692,5 +688,4 @@ window.onunhandledrejection = ({ reason }) => { status.textContent = reason.mess
 
 applyLanguage();
 applyLayout();
-listenCommands();
 await Promise.all([loadModels(), openExisting(), checkStatus()]);

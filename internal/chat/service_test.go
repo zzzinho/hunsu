@@ -36,7 +36,13 @@ type fakeProvider struct {
 	release   chan struct{}
 }
 
-func (f *fakeProvider) Status(context.Context) llm.Status { return llm.Status{Ready: true} }
+// 제한 시간 없이 상태를 물으면 쓸 수 없다고 답한다. 상태 확인 CLI 가 멈춰도 hunsu 가 기다리지 않게 하는지 본다.
+func (f *fakeProvider) Status(ctx context.Context) llm.Status {
+	if _, ok := ctx.Deadline(); !ok {
+		return llm.Status{Problem: "no deadline"}
+	}
+	return llm.Status{Ready: true}
+}
 
 func (f *fakeProvider) Name() string { return cmp.Or(f.name, "fake") }
 
@@ -320,7 +326,7 @@ func TestService(t *testing.T) {
 				return f.lastRequest().Tools.URL
 			},
 			hunsuTools.URL},
-		{"provider 의 이름과 지금 쓸 수 있는지를 알려준다",
+		{"provider 의 이름과 지금 쓸 수 있는지를 제한 시간 안에 알려준다",
 			func(f *fixture) string {
 				status := f.svc.Status(context.Background())
 				return fmt.Sprint(status.Provider, " ", status.Ready)

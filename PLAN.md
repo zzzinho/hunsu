@@ -60,7 +60,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 원본을 직접 고치거나 
  ├─ /api/models    provider 의 모델 목록
  ├─ /api/undo·chat/reset  되돌리기, 새 대화
  ├─ /api/events    열린 파일·design.css 변경 알림 (SSE)
- ├─ /api/ui·ui/commands  브라우저 화면 상태, 브라우저로 보내는 명령
+ ├─ /api/ui·events     브라우저 화면 상태, 파일 변경과 브라우저로 보내는 명령
  ├─ /mcp           외부 에이전트용 MCP 서버
  └─ llm.Provider   claude -p 또는 codex exec (작업 폴더 = 디자인 폴더)
 ```
@@ -157,7 +157,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | 구현 | 표준 라이브러리 JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`) | 도구 호출만 필요 |
 | 포트·인증 | 7777 고정, `Bearer` 토큰(사용자 설정 폴더, 0600, 재사용) | 등록한 주소·헤더가 바뀌지 않게. `-port` 로 바꾸면 다시 등록해야 한다 |
 | 화면 상태 | 브라우저가 `POST /api/ui` 로 알린다. 같은 출처만 | 가짜 선택 요소로 에이전트에 지시를 끼워 넣는 것 차단 |
-| 브라우저 명령 | `GET /api/ui/commands` (SSE) | `open_page` |
+| 브라우저 명령 | `GET /api/events` 의 `command` 이벤트 (SSE, 파일 변경 `change` 와 같은 연결) | `open_page`. 브라우저는 한 호스트에 연결을 6개까지만 열어 탭당 SSE 를 하나로 둔다 |
 | 안내문 | 디자인 규칙은 브라우저 채팅과 공유. 클라이언트 도구 이름을 쓰지 않는다 | 클라이언트 중립 |
 
 **렌더러**: 설치된 Chrome 계열 브라우저를 `--remote-debugging-pipe` 로 띄워 DevTools 프로토콜로 찍는다(WebSocket 불필요). 요청마다 새 프로세스, 너비 320~2560px(기본 1280), 위에서 최대 4000px, 30초 제한. 결과는 MCP 이미지로 돌려준다.

@@ -1,9 +1,11 @@
 package mcp
 
 import (
+	"bytes"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
+	"io"
 	"net/http"
 	"slices"
 )
@@ -108,17 +110,40 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "only POST is accepted", http.StatusMethodNotAllowed)
 		return
 	}
-	var req request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
 		writeJSON(w, response{JSONRPC: "2.0", Error: &rpcError{codeParse, err.Error()}})
 		return
 	}
-	if req.ID == nil {
-		w.WriteHeader(http.StatusAccepted)
+	// 2025-03-26 은 여러 요청을 배열로 묶어 보낼 수 있다(batch). 응답도 배열로, 알림에는 답하지 않는다.
+	var requests []request
+	batch := len(bytes.TrimSpace(body)) > 0 && bytes.TrimSpace(body)[0] == '['
+	if batch {
+		err = json.Unmarshal(body, &requests)
+	} else {
+		requests = make([]request, 1)
+		err = json.Unmarshal(body, &requests[0])
+	}
+	if err != nil {
+		writeJSON(w, response{JSONRPC: "2.0", Error: &rpcError{codeParse, err.Error()}})
 		return
 	}
-	result, rpcErr := s.handle(r.Context(), req)
-	writeJSON(w, response{JSONRPC: "2.0", ID: req.ID, Result: result, Error: rpcErr})
+	var responses []response
+	for _, req := range requests {
+		if req.ID == nil {
+			continue
+		}
+		result, rpcErr := s.handle(r.Context(), req)
+		responses = append(responses, response{JSONRPC: "2.0", ID: req.ID, Result: result, Error: rpcErr})
+	}
+	switch {
+	case len(responses) == 0:
+		w.WriteHeader(http.StatusAccepted)
+	case batch:
+		writeJSON(w, responses)
+	default:
+		writeJSON(w, responses[0])
+	}
 }
 
 func (s *Server) handle(ctx context.Context, req request) (any, *rpcError) {
