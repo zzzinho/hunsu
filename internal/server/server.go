@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"io"
 	"io/fs"
 	"net/http"
 	"time"
@@ -51,14 +52,33 @@ func New(p *project.Project, c *chat.Service, hub *ui.Hub, web fs.FS, pollEvery 
 	mux.HandleFunc("GET /api/versions/thumb", s.versionThumb)
 	mux.HandleFunc("POST /api/ui", s.updateUI)
 	mux.HandleFunc("GET /api/ui/commands", s.uiCommands)
-	mux.Handle("GET /p/", http.StripPrefix("/p/", noStore(http.FileServerFS(p.FS()))))
+	mux.Handle("GET /p/", http.StripPrefix("/p/", designFiles(p.FS())))
 	mux.Handle("GET /", http.FileServerFS(web))
 	return mux
 }
 
-func noStore(h http.Handler) http.Handler {
+// 렌더에는 디자인 파일만 준다. .hunsu/ 와 폴더 목록은 주지 않는다.
+// http.FileServer 는 index.html 을 폴더 주소로 돌려보내므로 파일을 직접 연다.
+func designFiles(fsys fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		name := r.URL.Path
+		if !project.IsDesignFile(name) {
+			http.NotFound(w, r)
+			return
+		}
+		f, err := fsys.Open(name)
+		if err != nil {
+			http.NotFound(w, r)
+			return
+		}
+		defer f.Close()
+		info, err := f.Stat()
+		content, seekable := f.(io.ReadSeeker)
+		if err != nil || info.IsDir() || !seekable {
+			http.NotFound(w, r)
+			return
+		}
 		w.Header().Set("Cache-Control", "no-store")
-		h.ServeHTTP(w, r)
+		http.ServeContent(w, r, name, info.ModTime(), content)
 	})
 }

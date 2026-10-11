@@ -94,7 +94,7 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 	if openBrowser {
 		exec.Command("open", url).Start()
 	}
-	return http.Serve(ln, mux)
+	return http.Serve(ln, server.Guard(mux))
 }
 
 // 브라우저 채팅을 처리할 LLM 을 고르는 유일한 곳이다. 다른 LLM 은 llm.Provider 를 구현한 뒤 여기에 더한다.

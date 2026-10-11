@@ -1,19 +1,21 @@
 package mcp
 
 import (
-	"cmp"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"net/http"
+	"slices"
 )
 
 const (
 	codeParse          = -32700
 	codeMethodNotFound = -32601
 	codeInvalidParams  = -32602
-	latestVersion      = "2025-06-18"
 )
+
+// 도구 호출만 쓰므로 이 버전들은 주고받는 형식이 같다. 첫 번째가 최신이다.
+var versions = []string{"2025-06-18", "2025-03-26", "2024-11-05"}
 
 type Info struct {
 	Name    string `json:"name"`
@@ -133,13 +135,17 @@ func (s *Server) handle(ctx context.Context, req request) (any, *rpcError) {
 	return nil, &rpcError{codeMethodNotFound, "unknown method: " + req.Method}
 }
 
-// 도구 호출만 쓰므로 2024-11-05 이후 버전은 주고받는 형식이 같다. 클라이언트가 요청한 버전을 그대로 쓴다.
+// 아는 버전이면 그대로, 모르면 최신 버전으로 답한다. 클라이언트가 그 버전을 쓸 수 없으면 연결을 끊는다 (MCP 버전 협상).
 func (s *Server) initialize(params json.RawMessage) initializeResult {
 	var p struct {
 		ProtocolVersion string `json:"protocolVersion"`
 	}
 	json.Unmarshal(params, &p)
-	return initializeResult{ProtocolVersion: cmp.Or(p.ProtocolVersion, latestVersion), ServerInfo: s.info, Instructions: s.instructions}
+	version := versions[0]
+	if slices.Contains(versions, p.ProtocolVersion) {
+		version = p.ProtocolVersion
+	}
+	return initializeResult{ProtocolVersion: version, ServerInfo: s.info, Instructions: s.instructions}
 }
 
 func (s *Server) list() map[string][]toolDescriptor {
