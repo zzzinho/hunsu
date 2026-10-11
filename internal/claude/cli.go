@@ -28,7 +28,9 @@ func (c CLI) Status(ctx context.Context) llm.Status {
 	if _, err := exec.LookPath(c.Path); err != nil {
 		return llm.Status{Problem: llm.NotInstalled, Fix: "brew install --cask claude-code"}
 	}
-	out, _ := exec.CommandContext(ctx, c.Path, "auth", "status", "--json").Output()
+	cmd := exec.CommandContext(ctx, c.Path, "auth", "status", "--json")
+	cmd.WaitDelay = time.Second
+	out, _ := cmd.Output()
 	var auth struct {
 		LoggedIn bool `json:"loggedIn"`
 	}

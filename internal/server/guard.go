@@ -21,6 +21,8 @@ func Guard(next http.Handler) http.Handler {
 			http.Error(w, "cross-origin request", http.StatusForbidden)
 			return
 		}
+		// 다른 웹사이트가 hunsu 를 투명한 iframe 으로 덮어 클릭을 훔치지 못하게 한다(clickjacking). 렌더 화면은 같은 출처라 괜찮다.
+		w.Header().Set("Content-Security-Policy", "frame-ancestors 'self'")
 		next.ServeHTTP(w, r)
 	})
 }

@@ -232,7 +232,7 @@ func TestServer_UICommands(t *testing.T) {
 		command ui.Command
 		want    string
 	}{
-		{"서버의 명령을 브라우저로 보낸다", ui.Command{Kind: ui.Open, Page: "a.html"}, `data: {"kind":"open","page":"a.html"}`},
+		{"서버의 명령을 파일 변경 알림과 같은 연결로 브라우저에 보낸다", ui.Command{Kind: ui.Open, Page: "a.html"}, `data: {"kind":"open","page":"a.html"}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -241,7 +241,7 @@ func TestServer_UICommands(t *testing.T) {
 			defer srv.Close()
 			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 			defer cancel()
-			req, _ := http.NewRequestWithContext(ctx, "GET", srv.URL+"/api/ui/commands", nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", srv.URL+"/api/events", nil)
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatal(err)

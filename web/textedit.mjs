@@ -6,19 +6,35 @@ const TAG_START = /<(\/?)([a-zA-Z][^\s/>]*)|<[!?]/y;
 const escapes = { '&': '&amp;', '<': '&lt;', '>': '&gt;', ' ': '&nbsp;' };
 const escapeText = (text) => text.replace(/[&<> ]/g, (char) => escapes[char]);
 
+// 따옴표는 = 바로 뒤에서만 속성값을 연다. data-x=it's 의 ' 는 글자다.
 function tagEnd(source, from) {
   let quote = null;
+  let afterEquals = false;
   for (let i = from; i < source.length; i++) {
     const char = source[i];
     if (quote) {
       if (char === quote) quote = null;
-    } else if (char === '"' || char === "'") {
-      quote = char;
     } else if (char === '>') {
       return i + 1;
+    } else if (char === '=') {
+      afterEquals = true;
+    } else if (afterEquals && (char === '"' || char === "'")) {
+      quote = char;
+      afterEquals = false;
+    } else if (!/\s/.test(char)) {
+      afterEquals = false;
     }
   }
   return source.length;
+}
+
+// <!--> 와 <!---> 는 그 자리에서 닫히는 빈 주석이다.
+function commentEnd(source, from) {
+  for (const empty of ['<!-->', '<!--->']) {
+    if (source.startsWith(empty, from)) return from + empty.length;
+  }
+  const close = source.indexOf('-->', from + 4);
+  return close < 0 ? source.length : close + 3;
 }
 
 function skipTo(source, pattern, from) {
@@ -41,8 +57,7 @@ function textSegments(source) {
     }
     if (source.startsWith('<!--', i)) {
       flush(i);
-      const close = source.indexOf('-->', i + 4);
-      i = start = close < 0 ? source.length : close + 3;
+      i = start = commentEnd(source, i);
       continue;
     }
     TAG_START.lastIndex = i;

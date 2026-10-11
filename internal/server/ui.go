@@ -21,23 +21,3 @@ func (s *Server) updateUI(w http.ResponseWriter, r *http.Request) {
 	s.hub.Update(state)
 	w.WriteHeader(http.StatusNoContent)
 }
-
-func (s *Server) uiCommands(w http.ResponseWriter, r *http.Request) {
-	inbox, cancel := s.hub.Subscribe()
-	defer cancel()
-	stream, err := startEvents(w)
-	if err != nil {
-		return
-	}
-	for {
-		select {
-		case <-r.Context().Done():
-			return
-		case command := <-inbox:
-			data, _ := json.Marshal(command)
-			if stream.send(string(data)) != nil {
-				return
-			}
-		}
-	}
-}

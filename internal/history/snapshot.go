@@ -15,7 +15,13 @@ import (
 )
 
 // capture 는 지금 디자인 파일을 state 의 dir 에 복사하고, 내용을 나타내는 해시를 돌려준다.
-func capture(p *project.Project, state *os.Root, dir string) (string, error) {
+// 실패하면 dir 을 지운다. 반쯤 쓴 복사본으로 되돌리면 빠진 파일이 지워진다.
+func capture(p *project.Project, state *os.Root, dir string) (hash string, err error) {
+	defer func() {
+		if err != nil {
+			err = errors.Join(err, state.RemoveAll(dir))
+		}
+	}()
 	listing, err := p.List()
 	if err != nil {
 		return "", err
@@ -23,7 +29,7 @@ func capture(p *project.Project, state *os.Root, dir string) (string, error) {
 	if err := state.MkdirAll(dir, 0o755); err != nil {
 		return "", err
 	}
-	hash := sha256.New()
+	sum := sha256.New()
 	for _, name := range listing.Files() {
 		data, err := p.Read(name)
 		if err != nil {
@@ -32,10 +38,10 @@ func capture(p *project.Project, state *os.Root, dir string) (string, error) {
 		if err := state.WriteFile(path.Join(dir, name), data, 0o644); err != nil {
 			return "", err
 		}
-		fmt.Fprintf(hash, "%s\x00%d\x00", name, len(data))
-		hash.Write(data)
+		fmt.Fprintf(sum, "%s\x00%d\x00", name, len(data))
+		sum.Write(data)
 	}
-	return hex.EncodeToString(hash.Sum(nil)), nil
+	return hex.EncodeToString(sum.Sum(nil)), nil
 }
 
 // restore 는 dir 에 복사해 둔 파일로 디자인 파일을 되돌린다. 그 뒤에 생긴 파일은 지우고, 디자인 파일이 아닌 것은 무시한다.
@@ -73,15 +79,17 @@ func restore(p *project.Project, state *os.Root, dir string) error {
 	return nil
 }
 
-// numbered 는 dir 아래 순번 이름(000001…)을 오래된 것부터 돌려준다.
+// numbered 는 dir 아래 순번 이름(000001…)을 오래된 것부터 돌려준다. Finder 의 .DS_Store 같은 다른 이름은 뺀다.
 func numbered(state *os.Root, dir string) ([]string, error) {
 	entries, err := fs.ReadDir(state.FS(), dir)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
-	names := make([]string, len(entries))
-	for i, e := range entries {
-		names[i] = e.Name()
+	var names []string
+	for _, e := range entries {
+		if _, convErr := strconv.Atoi(e.Name()); convErr == nil && e.IsDir() {
+			names = append(names, e.Name())
+		}
 	}
 	return names, err
 }

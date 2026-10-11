@@ -52,7 +52,6 @@ func New(p *project.Project, c *chat.Service, hub *ui.Hub, web fs.FS, pollEvery 
 	mux.HandleFunc("POST /api/versions/restore", s.restoreVersion)
 	mux.HandleFunc("GET /api/versions/thumb", s.versionThumb)
 	mux.HandleFunc("POST /api/ui", s.updateUI)
-	mux.HandleFunc("GET /api/ui/commands", s.uiCommands)
 	mux.Handle("GET /p/", http.StripPrefix("/p/", designFiles(p.FS())))
 	mux.Handle("GET /", http.FileServerFS(web))
 	return mux

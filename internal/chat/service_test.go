@@ -21,19 +21,28 @@ import (
 )
 
 // writes·reply 의 {dir} 은 실행한 폴더 이름(비교안 번호)으로 바뀐다. failIn 폴더에서 실행하면 실패한다.
+// noStart 면 시작 이벤트 없이 err 로 끝난다. release 가 있으면 첫 실행이 started 를 닫고 release 를 기다린다.
 type fakeProvider struct {
-	mu       sync.Mutex
-	name     string
-	requests []llm.Request
-	writes   map[string]string
-	reply    string
-	err      error
-	failIn   string
-	started  chan struct{}
-	release  chan struct{}
+	mu        sync.Mutex
+	startOnce sync.Once
+	noStart   bool
+	name      string
+	requests  []llm.Request
+	writes    map[string]string
+	reply     string
+	err       error
+	failIn    string
+	started   chan struct{}
+	release   chan struct{}
 }
 
-func (f *fakeProvider) Status(context.Context) llm.Status { return llm.Status{Ready: true} }
+// 제한 시간 없이 상태를 물으면 쓸 수 없다고 답한다. 상태 확인 CLI 가 멈춰도 hunsu 가 기다리지 않게 하는지 본다.
+func (f *fakeProvider) Status(ctx context.Context) llm.Status {
+	if _, ok := ctx.Deadline(); !ok {
+		return llm.Status{Problem: "no deadline"}
+	}
+	return llm.Status{Ready: true}
+}
 
 func (f *fakeProvider) Name() string { return cmp.Or(f.name, "fake") }
 
@@ -45,9 +54,12 @@ func (f *fakeProvider) Run(_ context.Context, req llm.Request, emit func(llm.Eve
 	f.mu.Lock()
 	f.requests = append(f.requests, req)
 	f.mu.Unlock()
+	if f.noStart {
+		return f.err
+	}
 	emit(llm.Event{Kind: llm.Started, SessionID: "s1"})
 	if f.release != nil {
-		close(f.started)
+		f.startOnce.Do(func() { close(f.started) })
 		<-f.release
 	}
 	dir := filepath.Base(req.Dir)
@@ -242,6 +254,23 @@ func TestService(t *testing.T) {
 				return f.lastRequest().Prompt
 			},
 			"[Request] 고쳐"},
+		{"사용자가 지운 디자인 파일도 고친 파일로 알린다",
+			func(f *fixture) string {
+				f.send(chat.Turn{Prompt: "1"})
+				f.must(f.project.Remove("design.css"))
+				f.send(chat.Turn{Prompt: "2"})
+				return f.lastRequest().Prompt
+			},
+			"[Notice] Files the user edited since your last reply: design.css. Re-read them before editing.\n[Request] 2"},
+		{"provider 가 시작하지 못한 요청 뒤에는 새 대화이므로 디자인 시스템을 다시 붙인다",
+			func(f *fixture) string {
+				f.runner.noStart, f.runner.err = true, errors.New("not logged in")
+				f.send(chat.Turn{Prompt: "1"})
+				f.runner.noStart, f.runner.err = false, nil
+				f.send(chat.Turn{Prompt: "2"})
+				return f.lastRequest().Prompt
+			},
+			designBlock + "[Request] 2"},
 		{"사용자가 고친 디자인 시스템 파일은 바뀐 내용을 붙인다",
 			func(f *fixture) string {
 				f.warmUp()
@@ -297,7 +326,7 @@ func TestService(t *testing.T) {
 				return f.lastRequest().Tools.URL
 			},
 			hunsuTools.URL},
-		{"provider 의 이름과 지금 쓸 수 있는지를 알려준다",
+		{"provider 의 이름과 지금 쓸 수 있는지를 제한 시간 안에 알려준다",
 			func(f *fixture) string {
 				status := f.svc.Status(context.Background())
 				return fmt.Sprint(status.Provider, " ", status.Ready)
@@ -506,6 +535,41 @@ func TestService(t *testing.T) {
 				return fmt.Sprint(errors.Is(f.svc.ChooseVariant(2, ""), history.ErrNoVariant))
 			},
 			"true"},
+		{"새 비교안을 만들다 취소하면 이전 비교안도 고를 수 없다",
+			func(f *fixture) string {
+				f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2)
+				ctx, cancel := context.WithCancel(context.Background())
+				cancel()
+				err := f.svc.SendVariants(ctx, chat.Turn{Prompt: "다시"}, 2, func(llm.Event) {})
+				return fmt.Sprint(errors.Is(err, context.Canceled), " [", f.variants(), "]")
+			},
+			"true []"},
+		{"비교안을 만드는 동안에도 고를 안 목록을 막힘 없이 읽는다",
+			func(f *fixture) string {
+				f.sendVariants(chat.Turn{Prompt: "처음"}, 2)
+				f.runner.started, f.runner.release = make(chan struct{}), make(chan struct{})
+				done := make(chan string)
+				go func() { done <- f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2) }()
+				<-f.runner.started
+				during := f.variants()
+				close(f.runner.release)
+				<-done
+				return "[" + during + "] " + fmt.Sprint(len(f.svc.Variants()))
+			},
+			"[] 2"},
+		{"안을 고르다 실패하면 고르기 전으로 되돌리고, 다시 고를 수 있다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "안 {dir}"}
+				f.sendVariants(chat.Turn{Page: "a.html", Prompt: "둥글게"}, 2)
+				unreadable := f.project.StatePath("variants", "1", "design.css")
+				f.must(os.Chmod(unreadable, 0))
+				err := f.svc.ChooseVariant(2, "a.html")
+				afterFailure := f.read("a.html")
+				f.must(os.Chmod(unreadable, 0o644))
+				f.must(f.svc.ChooseVariant(2, "a.html"))
+				return fmt.Sprint(err != nil, " ", afterFailure, " / ", f.read("a.html"))
+			},
+			"true a / 안 2"},
 		{"비교안을 버리면 고를 것이 없다",
 			func(f *fixture) string {
 				f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2)

@@ -60,7 +60,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 원본을 직접 고치거나 
  ├─ /api/models    provider 의 모델 목록
  ├─ /api/undo·chat/reset  되돌리기, 새 대화
  ├─ /api/events    열린 파일·design.css 변경 알림 (SSE)
- ├─ /api/ui·ui/commands  브라우저 화면 상태, 브라우저로 보내는 명령
+ ├─ /api/ui·events     브라우저 화면 상태, 파일 변경과 브라우저로 보내는 명령
  ├─ /mcp           외부 에이전트용 MCP 서버
  └─ llm.Provider   claude -p 또는 codex exec (작업 폴더 = 디자인 폴더)
 ```
@@ -130,21 +130,21 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 **프롬프트**
 
 ```
-[현재 페이지] landing.html
-[알림] 마지막 응답 이후 사용자가 직접 고친 파일: design.css. 고치기 전에 다시 읽어라.
-[디자인 시스템]
+[Current page] landing.html
+[Notice] Files the user edited since your last reply: design.css. Re-read them before editing.
+[Design system]
 <design.css>…</design.css>
-[에셋] assets/logo.png, assets/hero.jpg
-[선택한 요소] main > section.hero > button.cta
+[Assets] assets/logo.png, assets/hero.jpg
+[Selected element] main > section.hero > button.cta
 <button class="cta">시작하기</button>
-[요청] 더 크게
+[Request] 더 크게
 ```
 
-- `[알림]`: 응답 직후 파일 해시를 기억하고 달라진 파일을 알린다. 되돌리기도 포함. 없으면 예전 내용으로 Edit 하다 실패해 6초가 17초가 된다.
-- `[에셋]`: 올린 에셋이 있으면 요청마다 경로 목록을 붙인다.
+- `[Notice]`: 응답 직후 파일 해시를 기억하고 달라진 파일을 알린다. 되돌리기도 포함. 없으면 예전 내용으로 Edit 하다 실패해 6초가 17초가 된다.
+- `[Assets]`: 올린 에셋이 있으면 요청마다 경로 목록을 붙인다.
 - 선택한 요소의 HTML 은 2000자까지.
 - **고정된 것은 앞, 바뀌는 것은 뒤.** 프롬프트 캐시는 앞부분이 같아야 재사용된다. system prompt 는 지시문(`internal/chat/instructions.md`)과 디자인 규칙(`internal/project/rules.md`)만 두고 바뀌지 않는다.
-- `[디자인 시스템]`: 대화의 첫 요청(새 대화·서버 재시작 포함)에 전체를, 이후에는 사용자가 바꾼 파일만 붙인다. LLM 이 고친 내용은 다시 보내지 않는다.
+- `[Design system]`: 대화의 첫 요청(새 대화·서버 재시작 포함)에 전체를, 이후에는 사용자가 바꾼 파일만 붙인다. LLM 이 고친 내용은 다시 보내지 않는다.
 
 ## 7. 외부 에이전트 (MCP)
 
@@ -157,7 +157,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | 구현 | 표준 라이브러리 JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`) | 도구 호출만 필요 |
 | 포트·인증 | 7777 고정, `Bearer` 토큰(사용자 설정 폴더, 0600, 재사용) | 등록한 주소·헤더가 바뀌지 않게. `-port` 로 바꾸면 다시 등록해야 한다 |
 | 화면 상태 | 브라우저가 `POST /api/ui` 로 알린다. 같은 출처만 | 가짜 선택 요소로 에이전트에 지시를 끼워 넣는 것 차단 |
-| 브라우저 명령 | `GET /api/ui/commands` (SSE) | `open_page` |
+| 브라우저 명령 | `GET /api/events` 의 `command` 이벤트 (SSE, 파일 변경 `change` 와 같은 연결) | `open_page`. 브라우저는 한 호스트에 연결을 6개까지만 열어 탭당 SSE 를 하나로 둔다 |
 | 안내문 | 디자인 규칙은 브라우저 채팅과 공유. 클라이언트 도구 이름을 쓰지 않는다 | 클라이언트 중립 |
 
 **렌더러**: 설치된 Chrome 계열 브라우저를 `--remote-debugging-pipe` 로 띄워 DevTools 프로토콜로 찍는다(WebSocket 불필요). 요청마다 새 프로세스, 너비 320~2560px(기본 1280), 위에서 최대 4000px, 30초 제한. 결과는 MCP 이미지로 돌려준다.

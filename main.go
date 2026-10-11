@@ -98,9 +98,11 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 	if renderer == nil {
 		fmt.Println("Chrome not found: screenshots, PNG export and version thumbnails are off")
 	}
-	if status := llmProvider.Status(context.Background()); !status.Ready {
-		fmt.Printf("%s is %s. Run: %s\n", llmProvider.Name(), strings.ReplaceAll(status.Problem, "-", " "), status.Fix)
-	}
+	go func() {
+		if status := assistant.Status(context.Background()); !status.Ready {
+			fmt.Printf("%s is %s. Run: %s\n", status.Provider, strings.ReplaceAll(status.Problem, "-", " "), status.Fix)
+		}
+	}()
 	if openBrowser {
 		exec.Command("open", url).Start()
 	}

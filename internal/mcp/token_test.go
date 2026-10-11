@@ -16,6 +16,7 @@ func TestLoadToken(t *testing.T) {
 	}{
 		{"토큰 파일이 없으면 새로 만들어 본인만 읽을 수 있게 저장한다", "", ""},
 		{"토큰 파일이 있으면 그 토큰을 그대로 쓴다", "saved-token", "saved-token"},
+		{"토큰 파일이 비어 있으면 새로 만든다", "\n", ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

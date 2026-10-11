@@ -26,6 +26,8 @@ func TestGuard(t *testing.T) {
 		{"출처를 감춘 요청(null)은 거부한다", "POST", "127.0.0.1:7777", "null", 403},
 		{"출처가 없는 요청은 브라우저가 아닌 로컬 프로그램으로 보고 받는다", "POST", "127.0.0.1:7777", "", 200},
 	}
+	// 받은 요청의 응답은 다른 웹사이트의 iframe 에 넣을 수 없다 (clickjacking).
+	const frameAncestors = "frame-ancestors 'self'"
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			req := httptest.NewRequest(tt.method, "/api/undo", nil)
@@ -35,8 +37,9 @@ func TestGuard(t *testing.T) {
 			}
 			rec := httptest.NewRecorder()
 			server.Guard(ok).ServeHTTP(rec, req)
-			if rec.Code != tt.want {
-				t.Errorf("%s Host=%s Origin=%q = %d, want %d", tt.method, tt.host, tt.origin, rec.Code, tt.want)
+			csp := rec.Header().Get("Content-Security-Policy")
+			if rec.Code != tt.want || (rec.Code == 200 && csp != frameAncestors) {
+				t.Errorf("%s Host=%s Origin=%q = %d (CSP %q), want %d (CSP %q)", tt.method, tt.host, tt.origin, rec.Code, csp, tt.want, frameAncestors)
 			}
 		})
 	}

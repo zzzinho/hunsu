@@ -56,6 +56,7 @@ func (s *Service) SendVariants(ctx context.Context, t Turn, count int, emit func
 	if err != nil {
 		return err
 	}
+	s.pending.Store(nil)
 	dirs, err := s.variants.Prepare(count)
 	if err != nil {
 		return err
@@ -95,7 +96,7 @@ func (s *Service) SendVariants(ctx context.Context, t Turn, count int, emit func
 	if err := ctx.Err(); err != nil {
 		return errors.Join(err, s.variants.Clear())
 	}
-	s.pending = &variantRun{turn: t, variants: variants}
+	s.pending.Store(&variantRun{turn: t, variants: variants})
 	emit(llm.Event{Kind: Ended})
 	return nil
 }
@@ -113,10 +114,11 @@ func (s *Service) variantPage(id int, before []string, viewing string) string {
 
 // Variants 는 고르기를 기다리는 안이다. 없으면 비어 있다.
 func (s *Service) Variants() []Variant {
-	if s.pending == nil {
+	run := s.pending.Load()
+	if run == nil {
 		return []Variant{}
 	}
-	return slices.Clone(s.pending.variants)
+	return slices.Clone(run.variants)
 }
 
 func (s *Service) VariantFiles(id int) (fs.FS, error) { return s.variants.FS(id) }
@@ -127,7 +129,7 @@ func (s *Service) ChooseVariant(id int, page string) error {
 		return ErrBusy
 	}
 	defer s.mu.Unlock()
-	run := s.pending
+	run := s.pending.Load()
 	if run == nil {
 		return ErrNoVariants
 	}
@@ -142,18 +144,19 @@ func (s *Service) ChooseVariant(id int, page string) error {
 	}
 	text := truncate(run.turn.Prompt, labelLimit)
 	// 버전은 지금 파일로 남기므로, 나머지 안을 차례로 적용하며 남긴 뒤 고른 안을 마지막에 적용한다.
+	// 중간에 실패하면 고르지 않은 안이 남지 않게 고르기 전으로 되돌린다. 안은 남겨 다시 고를 수 있다.
 	for _, v := range run.variants {
 		if v.ID == id || v.Error != "" {
 			continue
 		}
 		if err := s.keepVariant(v, history.Note{Kind: kindVariant, Text: text, Ref: v.ID}); err != nil {
-			return err
+			return errors.Join(err, s.history.Undo())
 		}
 	}
 	if err := s.keepVariant(run.variants[id-1], history.Note{Kind: kindChosen, Text: text, Ref: id}); err != nil {
-		return err
+		return errors.Join(err, s.history.Undo())
 	}
-	s.pending = nil
+	s.pending.Store(nil)
 	return s.variants.Clear()
 }
 
@@ -170,6 +173,6 @@ func (s *Service) DiscardVariants() error {
 		return ErrBusy
 	}
 	defer s.mu.Unlock()
-	s.pending = nil
+	s.pending.Store(nil)
 	return s.variants.Clear()
 }

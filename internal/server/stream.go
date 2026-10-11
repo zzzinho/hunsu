@@ -18,7 +18,7 @@ func startEvents(w http.ResponseWriter) (*eventWriter, error) {
 	return e, e.controller.Flush()
 }
 
-func (e *eventWriter) send(data string) error {
-	fmt.Fprintf(e.w, "data: %s\n\n", data)
+func (e *eventWriter) send(event, data string) error {
+	fmt.Fprintf(e.w, "event: %s\ndata: %s\n\n", event, data)
 	return e.controller.Flush()
 }
