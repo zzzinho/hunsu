@@ -18,7 +18,7 @@ type CLI struct {
 }
 
 // 첫 번째가 기본이다. 2026-10 에 ChatGPT 로그인으로 쓸 수 있음을 확인한 모델이다 (PLAN.md 11).
-var models = []llm.Model{{ID: "gpt-5.6-sol", Label: "gpt-5.6-sol"}, {ID: "gpt-5.6-terra", Label: "gpt-5.6-terra"}, {ID: "gpt-5.6-luna", Label: "gpt-5.6-luna (빠름)"}}
+var models = []llm.Model{{ID: "gpt-5.6-sol", Label: "gpt-5.6-sol"}, {ID: "gpt-5.6-terra", Label: "gpt-5.6-terra"}, {ID: "gpt-5.6-luna", Label: "gpt-5.6-luna", Fast: true}}
 
 func (CLI) Name() string { return "codex" }
 
@@ -42,7 +42,7 @@ func (c CLI) Run(ctx context.Context, req llm.Request, emit func(llm.Event)) err
 	cmd.Stderr = &stderr
 	cmd.WaitDelay = time.Second
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("codex 실행 실패: %w: %s", err, bytes.TrimSpace(stderr.Bytes()))
+		return fmt.Errorf("codex failed: %w: %s", err, bytes.TrimSpace(stderr.Bytes()))
 	}
 	// 턴이 실패해도 종료 코드는 0 이다.
 	if failure != "" {

@@ -16,8 +16,8 @@ const (
 )
 
 var (
-	ErrNotAsset = errors.New("에셋은 이미지(png·jpg·gif·webp·avif·svg)와 폰트(woff·woff2·ttf·otf)만")
-	ErrTooLarge = errors.New("에셋은 10MB 까지")
+	ErrNotAsset = errors.New("assets must be images (png, jpg, gif, webp, avif, svg) or fonts (woff, woff2, ttf, otf)")
+	ErrTooLarge = errors.New("assets are limited to 10 MB")
 )
 
 var assetTypes = map[string]string{

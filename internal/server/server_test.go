@@ -73,6 +73,7 @@ func TestServer_API(t *testing.T) {
 		{"템플릿으로 새 파일을 만든다", "POST", "/api/file?path=new.html", "", 201, "", ""},
 		{"편집 대상이 아닌 파일은 거부한다", "GET", "/api/file?path=notes.txt", "", 403, "", ""},
 		{"없는 파일은 없다고 알린다", "GET", "/api/file?path=none.html", "", 404, "", ""},
+		{"오류는 화면이 번역할 코드와 함께 JSON 으로 알린다", "POST", "/api/undo", "", 409, `{"code":"nothing-to-undo","message":"nothing to undo"}`, "Content-Type: application/json"},
 		{"이미 있는 파일은 새로 만들지 않는다", "POST", "/api/file?path=page.html", "", 409, "", ""},
 		{"에셋을 올린다", "POST", "/api/assets?name=logo.png", "png", 201, "", ""},
 		{"이미지·폰트가 아닌 에셋은 거부한다", "POST", "/api/assets?name=a.js", "js", 415, "", ""},

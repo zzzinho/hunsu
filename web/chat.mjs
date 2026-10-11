@@ -9,29 +9,29 @@ export function parseSSE(text) {
 
 const kilobytes = (bytes) => `${(bytes / 1024).toFixed(1)}KB`;
 
-const toolSteps = { screenshot: '화면 확인하는 중' };
+const toolSteps = { screenshot: 'step.toolScreenshot' };
 
 const steps = {
-  start: () => '시작했습니다',
-  think: () => '생각하는 중',
-  read: (e) => (e.file ? `${e.file} 읽는 중` : '파일 여는 중'),
-  write: (e) => (e.file ? `${e.file} 쓰는 중${e.size ? ` · ${kilobytes(e.size)}` : ''}` : '파일 쓰기 시작'),
-  answer: () => '답변 쓰는 중',
-  tool: (e) => toolSteps[e.text] ?? `${e.text} 쓰는 중`,
-  retry: () => '다시 시도하는 중',
-  fail: (e) => `실패: ${e.text}`,
-  error: (e) => `오류: ${e.text}`,
-  end: () => '완료',
+  start: (e, t) => t('step.start'),
+  think: (e, t) => t('step.think'),
+  read: (e, t) => (e.file ? t('step.read', { file: e.file }) : t('step.readAny')),
+  write: (e, t) => (e.file ? `${t('step.write', { file: e.file })}${e.size ? ` · ${kilobytes(e.size)}` : ''}` : t('step.writeAny')),
+  answer: (e, t) => t('step.answer'),
+  tool: (e, t) => (toolSteps[e.text] ? t(toolSteps[e.text]) : t('step.tool', { tool: e.text })),
+  retry: (e, t) => t('step.retry'),
+  fail: (e, t) => t('step.fail', { text: e.text }),
+  error: (e, t) => t('step.error', { text: e.text }),
+  end: (e, t) => t('step.end'),
 };
 
-export const stepText = (event) => steps[event.kind]?.(event) ?? null;
+export const stepText = (event, t) => steps[event.kind]?.(event, t) ?? null;
 
-export function elapsedText(ms) {
+export function elapsedText(ms, t) {
   const seconds = Math.floor(ms / 1000);
-  return seconds < 60 ? `${seconds}초` : `${Math.floor(seconds / 60)}분 ${seconds % 60}초`;
+  return seconds < 60 ? t('elapsed.seconds', { s: seconds }) : t('elapsed.minutes', { m: Math.floor(seconds / 60), s: seconds % 60 });
 }
 
-export const variantsText = (steps) => Object.keys(steps)
+export const variantsText = (steps, t) => Object.keys(steps)
   .sort((a, b) => a - b)
-  .map((id) => `안 ${id} · ${steps[id]}`)
+  .map((id) => t('variants.step', { id, step: steps[id] }))
   .join(' / ');

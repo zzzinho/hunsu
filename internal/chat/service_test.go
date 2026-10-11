@@ -131,7 +131,14 @@ func (f *fixture) versions() string {
 	f.must(err)
 	var out []string
 	for _, v := range versions {
-		out = append(out, fmt.Sprintf("%d:%s:%s", v.ID, v.Label, v.Page))
+		label := v.Kind
+		if v.Text != "" {
+			label += " " + v.Text
+		}
+		if v.Ref != 0 {
+			label += fmt.Sprintf("#%d", v.Ref)
+		}
+		out = append(out, fmt.Sprintf("%d:%s:%s", v.ID, label, v.Page))
 	}
 	return strings.Join(out, " ")
 }
@@ -144,7 +151,7 @@ func (f *fixture) read(name string) string {
 
 func (f *fixture) warmUp() { f.send(chat.Turn{Prompt: "준비"}) }
 
-const designBlock = "[디자인 시스템]\n<design.css>\n:root { --color-primary: red; }\n</design.css>\n"
+const designBlock = "[Design system]\n<design.css>\n:root { --color-primary: red; }\n</design.css>\n"
 
 func (f *fixture) must(err error) {
 	f.t.Helper()
@@ -183,14 +190,14 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Page: "a.html", Prompt: "더 크게"})
 				return f.lastRequest().Prompt
 			},
-			"[현재 페이지] a.html\n[요청] 더 크게"},
+			"[Current page] a.html\n[Request] 더 크게"},
 		{"열린 페이지가 없으면 요청만 보낸다",
 			func(f *fixture) string {
 				f.warmUp()
 				f.send(chat.Turn{Prompt: "랜딩 페이지 만들어줘"})
 				return f.lastRequest().Prompt
 			},
-			"[요청] 랜딩 페이지 만들어줘"},
+			"[Request] 랜딩 페이지 만들어줘"},
 		{"선택한 요소의 위치와 HTML 을 함께 보낸다",
 			func(f *fixture) string {
 				f.warmUp()
@@ -198,7 +205,7 @@ func TestService(t *testing.T) {
 					Selection: &ui.Selection{Selector: "main > button.cta", HTML: `<button class="cta">시작</button>`}})
 				return f.lastRequest().Prompt
 			},
-			"[현재 페이지] a.html\n[선택한 요소] main > button.cta\n<button class=\"cta\">시작</button>\n[요청] 더 크게"},
+			"[Current page] a.html\n[Selected element] main > button.cta\n<button class=\"cta\">시작</button>\n[Request] 더 크게"},
 		{"선택한 요소의 HTML 이 길면 앞의 2000자만 보낸다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "고쳐", Selection: &ui.Selection{Selector: "body", HTML: strings.Repeat("가", 2100)}})
@@ -212,27 +219,27 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Prompt: "2"})
 				return f.lastRequest().Prompt
 			},
-			"[알림] 마지막 응답 이후 사용자가 직접 고친 파일: a.html. 고치기 전에 다시 읽어라.\n[요청] 2"},
+			"[Notice] Files the user edited since your last reply: a.html. Re-read them before editing.\n[Request] 2"},
 		{"대화의 첫 요청에는 디자인 시스템 전체를 요청 끝에 붙인다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Page: "a.html", Prompt: "고쳐"})
 				return f.lastRequest().Prompt
 			},
-			"[현재 페이지] a.html\n" + designBlock + "[요청] 고쳐"},
+			"[Current page] a.html\n" + designBlock + "[Request] 고쳐"},
 		{"디자인 시스템이 없으면 첫 요청에 없다고 알린다",
 			func(f *fixture) string {
 				f.must(f.project.Remove("design.css"))
 				f.send(chat.Turn{Prompt: "고쳐"})
 				return f.lastRequest().Prompt
 			},
-			"[디자인 시스템] 아직 없다\n[요청] 고쳐"},
+			"[Design system] none yet\n[Request] 고쳐"},
 		{"바뀌지 않은 디자인 시스템은 다시 보내지 않는다",
 			func(f *fixture) string {
 				f.warmUp()
 				f.send(chat.Turn{Prompt: "고쳐"})
 				return f.lastRequest().Prompt
 			},
-			"[요청] 고쳐"},
+			"[Request] 고쳐"},
 		{"사용자가 고친 디자인 시스템 파일은 바뀐 내용을 붙인다",
 			func(f *fixture) string {
 				f.warmUp()
@@ -240,7 +247,7 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Prompt: "고쳐"})
 				return f.lastRequest().Prompt
 			},
-			"[알림] 마지막 응답 이후 사용자가 직접 고친 파일: design.css. 고치기 전에 다시 읽어라.\n[디자인 시스템]\n<design.css>\n:root { --color-primary: blue; }\n</design.css>\n[요청] 고쳐"},
+			"[Notice] Files the user edited since your last reply: design.css. Re-read them before editing.\n[Design system]\n<design.css>\n:root { --color-primary: blue; }\n</design.css>\n[Request] 고쳐"},
 		{"LLM 이 직접 고친 디자인 시스템은 다시 보내지 않는다",
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"design.css": ":root { --color-primary: green; }"}
@@ -249,7 +256,7 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Prompt: "고쳐"})
 				return f.lastRequest().Prompt
 			},
-			"[요청] 고쳐"},
+			"[Request] 고쳐"},
 		{"새 대화를 시작하면 첫 요청에 디자인 시스템 전체를 다시 붙인다",
 			func(f *fixture) string {
 				f.warmUp()
@@ -257,7 +264,7 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Prompt: "고쳐"})
 				return f.lastRequest().Prompt
 			},
-			designBlock + "[요청] 고쳐"},
+			designBlock + "[Request] 고쳐"},
 		{"서버를 다시 켜면 첫 요청에 디자인 시스템 전체를 다시 붙인다",
 			func(f *fixture) string {
 				f.warmUp()
@@ -265,7 +272,7 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Prompt: "고쳐"})
 				return f.lastRequest().Prompt
 			},
-			designBlock + "[요청] 고쳐"},
+			designBlock + "[Request] 고쳐"},
 		{"사용자가 올린 에셋 목록을 요청마다 알린다",
 			func(f *fixture) string {
 				f.warmUp()
@@ -273,7 +280,7 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Prompt: "로고 넣어줘"})
 				return f.lastRequest().Prompt
 			},
-			"[에셋] assets/logo.png\n[요청] 로고 넣어줘"},
+			"[Assets] assets/logo.png\n[Request] 로고 넣어줘"},
 		{"system prompt 는 디자인 시스템이 바뀌어도 그대로라 캐시를 깨지 않는다",
 			func(f *fixture) string {
 				f.warmUp()
@@ -358,7 +365,7 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Page: "a.html", Prompt: "버튼 둥글게"})
 				return f.versions()
 			},
-			"2:버튼 둥글게:a.html 1:요청 전:a.html"},
+			"2:request 버튼 둥글게:a.html 1:before-request:a.html"},
 		{"요청 전에 사용자가 고친 내용은 '요청 전' 버전으로 따로 남는다",
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
@@ -367,7 +374,7 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Page: "a.html", Prompt: "2"})
 				return f.versions()
 			},
-			"4:2:a.html 3:요청 전:a.html 2:1:a.html 1:요청 전:a.html"},
+			"4:request 2:a.html 3:before-request:a.html 2:request 1:a.html 1:before-request:a.html"},
 		{"실패한 요청은 버전을 남기지 않는다",
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"a.html": "반쯤 고침"}
@@ -375,21 +382,21 @@ func TestService(t *testing.T) {
 				f.send(chat.Turn{Page: "a.html", Prompt: "고쳐"})
 				return f.versions()
 			},
-			"1:요청 전:a.html"},
+			"1:before-request:a.html"},
 		{"새로 만든 페이지가 있으면 그 페이지를 버전의 대표 페이지로 쓴다",
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"b.html": "b"}
 				f.send(chat.Turn{Page: "a.html", Prompt: "b 만들어"})
 				return f.versions()
 			},
-			"2:b 만들어:b.html 1:요청 전:a.html"},
+			"2:request b 만들어:b.html 1:before-request:a.html"},
 		{"보던 페이지가 없으면 첫 페이지를 대표 페이지로 쓴다",
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
 				f.send(chat.Turn{Prompt: "고쳐"})
 				return f.versions()
 			},
-			"2:고쳐:a.html 1:요청 전:a.html"},
+			"2:request 고쳐:a.html 1:before-request:a.html"},
 		{"버전으로 복원하면 그 파일로 돌아가고, 복원 전 상태와 복원 결과도 버전으로 남는다",
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
@@ -398,7 +405,7 @@ func TestService(t *testing.T) {
 				f.must(f.svc.Restore(1, "a.html"))
 				return f.read("a.html") + " / " + f.versions()
 			},
-			"a / 4:v1 복원:a.html 3:복원 전:a.html 2:고쳐:a.html 1:요청 전:a.html"},
+			"a / 4:restore#1:a.html 3:before-restore:a.html 2:request 고쳐:a.html 1:before-request:a.html"},
 		{"없는 버전으로는 복원하지 않고 아무것도 남기지 않는다",
 			func(f *fixture) string {
 				err := f.svc.Restore(9, "a.html")
@@ -422,7 +429,7 @@ func TestService(t *testing.T) {
 				f.must(err)
 				return fmt.Sprint(first, " ", second, " ", f.versions())
 			},
-			"true false 1:직접 저장:a.html"},
+			"true false 1:saved:a.html"},
 		{"비교안은 안마다 디자인 파일 복사본에서 도구 없이 새 대화로 실행한다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "준비"})
@@ -440,14 +447,14 @@ func TestService(t *testing.T) {
 				f.sendVariants(chat.Turn{Prompt: "둥글게"}, 3)
 				var out []string
 				for _, r := range f.variantRequests(3) {
-					line := r.Prompt[strings.Index(r.Prompt, "[비교안]"):strings.Index(r.Prompt, "[요청]")]
+					line := r.Prompt[strings.Index(r.Prompt, "[Variant]"):strings.Index(r.Prompt, "[Request]")]
 					out = append(out, fmt.Sprint(strings.Contains(r.Prompt, designBlock), " ", strings.TrimSpace(line)))
 				}
 				return strings.Join(out, "\n")
 			},
-			"true [비교안] 3개 중 1번째 안. 요청을 가장 충실하게 따른다. 다른 안과 뚜렷이 달라야 한다.\n" +
-				"true [비교안] 3개 중 2번째 안. 같은 요청을 더 과감한 색·글꼴·배치로 푼다. 다른 안과 뚜렷이 달라야 한다.\n" +
-				"true [비교안] 3개 중 3번째 안. 같은 요청을 더 단순하고 절제된 방향으로 푼다. 다른 안과 뚜렷이 달라야 한다."},
+			"true [Variant] Take 1 of 3. Follow the request as faithfully as possible. Make it clearly different from the other takes.\n" +
+				"true [Variant] Take 2 of 3. Solve the same request with bolder color, type and layout. Make it clearly different from the other takes.\n" +
+				"true [Variant] Take 3 of 3. Solve the same request in a simpler, more restrained way. Make it clearly different from the other takes."},
 		{"비교안 진행 이벤트에 안 번호를 붙이고, 모두 끝나면 끝을 알린다",
 			func(f *fixture) string { return f.sendVariants(chat.Turn{Prompt: "둥글게"}, 2) },
 			"0/end 1/start 2/start"},
@@ -474,7 +481,7 @@ func TestService(t *testing.T) {
 				f.must(f.svc.ChooseVariant(2, "a.html"))
 				return f.read("a.html") + " / " + f.versions() + " / [" + f.variants() + "]"
 			},
-			"안 2 / 3:안 2 선택 · 둥글게:a.html 2:안 1 · 둥글게:a.html 1:요청 전:a.html / []"},
+			"안 2 / 3:chosen 둥글게#2:a.html 2:variant 둥글게#1:a.html 1:before-request:a.html / []"},
 		{"안을 고른 뒤 되돌리면 고르기 전으로 돌아간다",
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"a.html": "안 {dir}"}

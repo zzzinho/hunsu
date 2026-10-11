@@ -26,8 +26,8 @@ type Renderer interface {
 var shotArgs = map[string]any{
 	"type": "object",
 	"properties": map[string]any{
-		"page":  map[string]any{"type": "string", "description": "찍을 페이지의 파일 이름 (예: index.html)"},
-		"width": map[string]any{"type": "integer", "description": "화면 너비 px. 기본 1280, 모바일은 390"},
+		"page":  map[string]any{"type": "string", "description": "File name of the page to capture (e.g. index.html)"},
+		"width": map[string]any{"type": "integer", "description": "Viewport width in px. Default 1280; use 390 for mobile"},
 	},
 	"required": []string{"page"},
 }
@@ -39,7 +39,7 @@ func Render(p *project.Project, renderer Renderer) []mcp.Tool {
 	}
 	return []mcp.Tool{{
 		Name:        "screenshot",
-		Description: "디자인 페이지를 브라우저로 렌더한 이미지(위에서부터 최대 4000px)를 돌려준다. 새 페이지를 만들었거나 레이아웃을 크게 바꾼 뒤 결과를 눈으로 확인할 때 쓴다. 작은 수정에는 쓰지 않는다.",
+		Description: "Returns an image of the design page rendered in a browser (top 4000 px at most). Use it to check the result after creating a page or substantially changing a layout. Do not use it for small edits.",
 		InputSchema: shotArgs,
 		Call: func(ctx context.Context, args json.RawMessage) (mcp.Result, error) {
 			return screenshot(ctx, p, renderer, args)
@@ -66,7 +66,7 @@ func screenshot(ctx context.Context, p *project.Project, renderer Renderer, args
 	defer cancel()
 	png, err := renderer.Screenshot(ctx, in.Page, width, shotHeight)
 	if errors.Is(err, context.DeadlineExceeded) {
-		err = fmt.Errorf("%s 이 %s 안에 다 그려지지 않았다", in.Page, shotTimeout)
+		err = fmt.Errorf("%s did not finish rendering within %s", in.Page, shotTimeout)
 	}
-	return mcp.Result{Image: png, Text: fmt.Sprintf("%s, 너비 %dpx", in.Page, width)}, err
+	return mcp.Result{Image: png, Text: fmt.Sprintf("%s, %dpx wide", in.Page, width)}, err
 }

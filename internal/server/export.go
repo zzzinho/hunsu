@@ -22,7 +22,7 @@ const (
 	exportTimeout = time.Minute
 )
 
-var errNoRenderer = errors.New("Chrome 이 없어 PNG 로 내보낼 수 없다. Chrome 을 설치한 뒤 hunsu 를 다시 켠다")
+var errNoRenderer = errors.New("PNG export needs Chrome. Install it and restart hunsu")
 
 func (s *Server) exportZIP(w http.ResponseWriter, r *http.Request) {
 	var buf bytes.Buffer

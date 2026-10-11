@@ -103,7 +103,7 @@ type callResult struct {
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.Header().Set("Allow", http.MethodPost)
-		http.Error(w, "POST 만 받는다", http.StatusMethodNotAllowed)
+		http.Error(w, "only POST is accepted", http.StatusMethodNotAllowed)
 		return
 	}
 	var req request
@@ -130,7 +130,7 @@ func (s *Server) handle(ctx context.Context, req request) (any, *rpcError) {
 	case "tools/call":
 		return s.call(ctx, req.Params)
 	}
-	return nil, &rpcError{codeMethodNotFound, "모르는 메서드: " + req.Method}
+	return nil, &rpcError{codeMethodNotFound, "unknown method: " + req.Method}
 }
 
 // 도구 호출만 쓰므로 2024-11-05 이후 버전은 주고받는 형식이 같다. 클라이언트가 요청한 버전을 그대로 쓴다.
@@ -171,7 +171,7 @@ func (s *Server) call(ctx context.Context, params json.RawMessage) (any, *rpcErr
 		}
 		return callResult{Content: result.content()}, nil
 	}
-	return nil, &rpcError{codeInvalidParams, "없는 도구: " + p.Name}
+	return nil, &rpcError{codeInvalidParams, "unknown tool: " + p.Name}
 }
 
 func writeJSON(w http.ResponseWriter, v any) {
@@ -183,7 +183,7 @@ func RequireToken(token string, next http.Handler) http.Handler {
 	want := []byte("Bearer " + token)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), want) != 1 {
-			http.Error(w, "토큰이 필요하다", http.StatusUnauthorized)
+			http.Error(w, "a valid token is required", http.StatusUnauthorized)
 			return
 		}
 		next.ServeHTTP(w, r)

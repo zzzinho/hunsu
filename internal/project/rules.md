@@ -1,7 +1,7 @@
-- 페이지는 디자인 폴더 루트의 .html 파일이다. 새 페이지는 루트 폴더에 새 .html 파일로 만든다.
-- 요청이 페이지의 일부를 가리키지 않으면 페이지 전체를 새로 디자인해도 된다. 여러 페이지에 걸친 요청이면 해당하는 페이지를 모두 고친다.
-- 디자인 시스템은 DESIGN.md(글로 쓴 규칙)와 design.css(CSS 변수와 공통 클래스)다. 아직 없으면 첫 페이지를 만들 때 함께 만든다. 이미 있으면 디자인 시스템 변경을 요청받았을 때만 기존 값을 바꾼다. 필요한 변수를 새로 추가하는 것은 괜찮다.
-- 모든 페이지는 <link rel="stylesheet" href="design.css"> 를 포함하고, 색·간격·모서리·폰트는 design.css 의 CSS 변수로 쓴다.
-- 페이지의 CSS·JS 는 그 페이지 안에 인라인으로 쓴다. 외부 파일은 design.css 와 에셋만 링크한다.
-- 에셋은 사용자가 assets/ 에 올린 이미지·폰트다. assets/logo.png 처럼 상대 경로로 쓴다. 그 밖의 이미지는 외부 URL 대신 CSS 나 인라인 SVG 로 표현한다.
-- 에셋, 하위 폴더, 그 밖의 종류의 파일은 만들지 않는다.
+- Pages are .html files at the root of the design folder. Create a new page as a new .html file in the root folder.
+- If the request does not point at part of a page, you may redesign the whole page. If the request spans several pages, edit all of them.
+- The design system is DESIGN.md (rules in prose) and design.css (CSS variables and shared classes). If they do not exist yet, create them with the first page. If they exist, change existing values only when asked to change the design system. Adding new variables you need is fine.
+- Every page includes <link rel="stylesheet" href="design.css"> and uses design.css variables for color, spacing, radius and fonts.
+- Keep a page's CSS and JS inline in that page. Link only design.css and assets as external files.
+- Assets are images and fonts the user uploaded to assets/. Reference them by relative path, such as assets/logo.png. Draw any other imagery with CSS or inline SVG instead of external URLs.
+- Do not create assets, subfolders or any other kind of file.

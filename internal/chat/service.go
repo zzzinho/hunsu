@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
-	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -22,16 +21,21 @@ const (
 	Ended   = "end"
 )
 
+// 버전의 종류. 화면이 종류에 맞는 문구로 바꾼다.
 const (
-	beforeRequest = "요청 전"
-	beforeRestore = "복원 전"
-	savedByUser   = "직접 저장"
-	labelLimit    = 60
+	kindRequest       = "request"
+	kindBeforeRequest = "before-request"
+	kindSaved         = "saved"
+	kindBeforeRestore = "before-restore"
+	kindRestore       = "restore"
+	kindVariant       = "variant"
+	kindChosen        = "chosen"
+	labelLimit        = 60
 )
 
 var (
-	ErrBusy        = errors.New("이미 요청을 처리하는 중")
-	ErrEmptyPrompt = errors.New("요청이 비어 있다")
+	ErrBusy        = errors.New("already handling a request")
+	ErrEmptyPrompt = errors.New("the request is empty")
 )
 
 type Turn struct {
@@ -100,7 +104,7 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	if err := s.history.Save(); err != nil {
 		return err
 	}
-	if _, err := s.timeline.Keep(beforeRequest, representative(nil, t.Page, before.Pages)); err != nil {
+	if _, err := s.timeline.Keep(history.Note{Kind: kindBeforeRequest}, representative(nil, t.Page, before.Pages)); err != nil {
 		return err
 	}
 	edited := s.editedSinceLastReply(current)
@@ -134,7 +138,7 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	if err := cmp.Or(runErr, listErr, saveErr); err != nil {
 		return err
 	}
-	if _, err := s.timeline.Keep(truncate(t.Prompt, labelLimit), representative(created, t.Page, after.Pages)); err != nil {
+	if _, err := s.timeline.Keep(history.Note{Kind: kindRequest, Text: truncate(t.Prompt, labelLimit)}, representative(created, t.Page, after.Pages)); err != nil {
 		return err
 	}
 	emit(llm.Event{Kind: Ended})
@@ -164,7 +168,7 @@ func (s *Service) SaveVersion(page string) (bool, error) {
 		return false, ErrBusy
 	}
 	defer s.mu.Unlock()
-	return s.timeline.Keep(savedByUser, page)
+	return s.timeline.Keep(history.Note{Kind: kindSaved}, page)
 }
 
 // Restore 는 버전 id 의 파일로 돌아간다. 복원 전 상태는 되돌리기와 버전에 남고, 복원 결과도 새 버전이 된다.
@@ -180,13 +184,13 @@ func (s *Service) Restore(id int, page string) error {
 	if err := s.history.Save(); err != nil {
 		return err
 	}
-	if _, err := s.timeline.Keep(beforeRestore, page); err != nil {
+	if _, err := s.timeline.Keep(history.Note{Kind: kindBeforeRestore}, page); err != nil {
 		return err
 	}
 	if _, err := s.timeline.Restore(id); err != nil {
 		return err
 	}
-	_, err = s.timeline.Keep(fmt.Sprintf("v%d 복원", id), v.Page)
+	_, err = s.timeline.Keep(history.Note{Kind: kindRestore, Ref: id}, v.Page)
 	return err
 }
 

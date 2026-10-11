@@ -23,7 +23,7 @@ func TestCLI_Run(t *testing.T) {
 		{"프롬프트를 표준 입력으로 넘긴다", "echo.sh", "-로 시작하는 요청", "answer reply:-로 시작하는 요청", ""},
 		{"종료 코드가 0 이어도 턴이 실패했으면 실패를 알린다", "turn-failed.sh", "", "fail:모델을 쓸 수 없다", "모델을 쓸 수 없다"},
 		{"codex 가 실패하면 표준 에러를 담아 알린다", "fail.sh", "", "", "boom"},
-		{"취소하면 곧바로 멈춘다", "hang.sh", "", "", "codex 실행 실패"},
+		{"취소하면 곧바로 멈춘다", "hang.sh", "", "", "codex failed"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

@@ -29,7 +29,7 @@ func (s *Server) saveVersion(w http.ResponseWriter, r *http.Request) {
 func (s *Server) restoreVersion(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil {
-		http.Error(w, "버전 번호가 숫자가 아니다", http.StatusBadRequest)
+		writeError(w, errBadID)
 		return
 	}
 	if err := s.chat.Restore(id, r.URL.Query().Get("page")); err != nil {
@@ -42,7 +42,7 @@ func (s *Server) restoreVersion(w http.ResponseWriter, r *http.Request) {
 func (s *Server) versionThumb(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.URL.Query().Get("id"))
 	if err != nil {
-		http.Error(w, "버전 번호가 숫자가 아니다", http.StatusBadRequest)
+		writeError(w, errBadID)
 		return
 	}
 	png, err := s.chat.Thumbnail(id)

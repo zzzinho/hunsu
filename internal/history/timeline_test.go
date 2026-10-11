@@ -25,7 +25,7 @@ func newTimeline(t *testing.T, thumb history.Thumbnailer) *timelineFixture {
 }
 
 func (f *timelineFixture) keep(label, page string) bool {
-	saved, err := f.timeline.Keep(label, page)
+	saved, err := f.timeline.Keep(history.Note{Kind: "request", Text: label}, page)
 	must(f.t, err)
 	return saved
 }
@@ -35,7 +35,7 @@ func (f *timelineFixture) list() string {
 	must(f.t, err)
 	var out []string
 	for _, v := range versions {
-		out = append(out, fmt.Sprintf("%d:%s:%s:%v", v.ID, v.Label, v.Page, v.Thumb))
+		out = append(out, fmt.Sprintf("%d:%s:%s:%v", v.ID, v.Text, v.Page, v.Thumb))
 	}
 	return strings.Join(out, " ")
 }
@@ -76,7 +76,7 @@ func TestTimeline(t *testing.T) {
 				f.keep("b 추가", "b.html")
 				v, err := f.timeline.Restore(1)
 				must(f.t, err)
-				return fmt.Sprint(v.Label, " ", readFiles(f.t, f.project))
+				return fmt.Sprint(v.Text, " ", readFiles(f.t, f.project))
 			},
 			"처음 map[a.html:1]"},
 		{"없는 버전은 복원하지 않는다", nil,

@@ -33,10 +33,10 @@ const version = "0.1.0"
 var webFiles embed.FS
 
 func main() {
-	noOpen := flag.Bool("no-open", false, "브라우저를 자동으로 열지 않는다")
+	noOpen := flag.Bool("no-open", false, "do not open the browser")
 	// MCP 클라이언트에 등록한 주소가 실행할 때마다 바뀌지 않도록 포트를 고정한다.
-	port := flag.Int("port", 7777, "서버 포트")
-	providerName := flag.String("provider", "", "브라우저 채팅의 LLM: claude, codex. 생략하면 설치된 것을 claude → codex 순으로 찾는다")
+	port := flag.Int("port", 7777, "server port")
+	providerName := flag.String("provider", "", "LLM for the browser chat: claude or codex. Defaults to the first installed of claude, codex")
 	flag.Parse()
 	if err := run(cmp.Or(flag.Arg(0), "."), *port, !*noOpen, *providerName); err != nil {
 		fmt.Fprintln(os.Stderr, "hunsu:", err)
@@ -60,7 +60,7 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 	}
 	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
 	if err != nil {
-		return fmt.Errorf("%w (다른 포트는 -port 로 지정한다)", err)
+		return fmt.Errorf("%w (choose another port with -port)", err)
 	}
 	url := "http://" + ln.Addr().String() + "/"
 	renderer := findRenderer(url + "p/")
@@ -86,10 +86,10 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 	}
 	mux.Handle("/", server.New(p, assistant, hub, web, 500*time.Millisecond, renderer))
 
-	fmt.Printf("hunsu: %s 를 %s 에서 엽니다 (LLM: %s)\n", p.Dir(), url, llmProvider.Name())
-	fmt.Printf("MCP 서버: %smcp (헤더 Authorization: Bearer %s). 클라이언트별 등록 방법은 README 참고\n", url, token)
+	fmt.Printf("hunsu: serving %s at %s (LLM: %s)\n", p.Dir(), url, llmProvider.Name())
+	fmt.Printf("MCP server: %smcp (header Authorization: Bearer %s). See the README to register it with your client\n", url, token)
 	if renderer == nil {
-		fmt.Println("Chrome 을 찾지 못해 screenshot 도구를 끈다")
+		fmt.Println("Chrome not found: screenshots, PNG export and version thumbnails are off")
 	}
 	if openBrowser {
 		exec.Command("open", url).Start()
@@ -117,13 +117,13 @@ func provider(name string) (llm.Provider, error) {
 			return p.make(path), nil
 		}
 		if name != "" {
-			return nil, fmt.Errorf("%s 를 찾지 못했다. 설치하고 로그인했는지 확인한다", name)
+			return nil, fmt.Errorf("%s not found. Install it and log in", name)
 		}
 	}
 	if name != "" {
-		return nil, fmt.Errorf("모르는 provider: %s (claude, codex 중 하나)", name)
+		return nil, fmt.Errorf("unknown provider %s (use claude or codex)", name)
 	}
-	fmt.Println("claude 나 codex 를 찾지 못했다. 둘 중 하나를 설치하고 로그인해야 브라우저 채팅을 쓸 수 있다")
+	fmt.Println("Neither claude nor codex found. Install and log in to one of them to use the browser chat")
 	return providers[0].make(providers[0].name), nil
 }
 

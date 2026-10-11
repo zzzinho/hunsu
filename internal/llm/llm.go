@@ -31,7 +31,9 @@ type MCPServer struct {
 	Token string
 }
 
+// Model 의 Fast 는 빠르고 싼 모델이라는 뜻이다. 화면이 알맞은 말로 표시한다.
 type Model struct {
 	ID    string `json:"id"`
 	Label string `json:"label"`
+	Fast  bool   `json:"fast,omitempty"`
 }

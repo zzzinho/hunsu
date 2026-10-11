@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-var ErrNotEditable = errors.New("편집 대상이 아닌 파일")
+var ErrNotEditable = errors.New("not an editable file")
 
 var designSystem = []string{"DESIGN.md", "design.css"}
 

@@ -102,7 +102,7 @@ func TestTools(t *testing.T) {
 			"a"},
 		{"되돌릴 시점이 없으면 undo 는 실패를 알린다",
 			func(f *fixture) string { return f.call("undo", `{}`) },
-			"error: 되돌릴 것이 없다"},
+			"error: nothing to undo"},
 		{"open_page 는 연결된 브라우저에 페이지를 열라고 보낸다",
 			func(f *fixture) string {
 				inbox, cancel := f.hub.Subscribe()
@@ -111,16 +111,16 @@ func TestTools(t *testing.T) {
 				command := <-inbox
 				return out + " / " + command.Kind + ":" + command.Page
 			},
-			"브라우저 1곳에서 a.html 을 열었다 / open:a.html"},
+			"opened a.html in 1 browser(s) / open:a.html"},
 		{"브라우저가 연결되어 있지 않으면 open_page 는 실패를 알린다",
 			func(f *fixture) string { return f.call("open_page", `{"page":"a.html"}`) },
-			"error: 연결된 브라우저가 없다. 사용자에게 hunsu 를 브라우저로 열어 달라고 한다"},
+			"error: no browser is connected. Ask the user to open hunsu in a browser"},
 		{"screenshot 은 페이지를 요청한 너비로 렌더한 이미지를 돌려준다",
 			func(f *fixture) string { return f.call("screenshot", `{"page":"a.html","width":390}`) },
-			"image:a.html@390 / a.html, 너비 390px"},
+			"image:a.html@390 / a.html, 390px wide"},
 		{"screenshot 은 없는 페이지를 찍지 않는다",
 			func(f *fixture) string { return f.call("screenshot", `{"page":"none.html"}`) },
-			"error: none.html 은 페이지가 아니다. get_context 의 pages 중에서 고른다"},
+			"error: none.html is not a page. Pick one of get_context's pages"},
 		{"Chrome 이 없으면 screenshot 도구를 내놓지 않는다",
 			func(f *fixture) string {
 				svc, err := chat.New(f.project, idleProvider{}, chat.Options{})
@@ -143,7 +143,7 @@ func TestTools(t *testing.T) {
 			"screenshot"},
 		{"없는 페이지는 열지 않는다",
 			func(f *fixture) string { return f.call("open_page", `{"page":"none.html"}`) },
-			"error: none.html 은 페이지가 아니다. get_context 의 pages 중에서 고른다"},
+			"error: none.html is not a page. Pick one of get_context's pages"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

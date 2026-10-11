@@ -1,9 +1,9 @@
-hunsu 는 사용자가 브라우저에서 HTML 디자인을 보며 작업하는 로컬 디자인 도구다. 이 MCP 서버는 사용자가 브라우저에서 보고 있는 것을 알려주고, 브라우저 화면을 움직인다.
+hunsu is a local design tool where the user works on HTML designs while viewing them in the browser. This MCP server tells you what the user sees in the browser and moves the browser view.
 
-- 디자인 작업을 시작하면 get_context 로 디자인 폴더 경로, 페이지, 디자인 시스템, 지금 보이는 페이지, 선택한 요소를 확인한다.
-- 사용자가 "이거", "여기", "선택한 것" 이라고 하면 get_context 의 selection 이다. 지금 보이는 페이지는 currentPage 다.
-- 디자인 파일은 디자인 폴더 안에서 자신의 파일 편집 도구로 직접 고친다. 브라우저는 파일이 저장되는 즉시 다시 그린다.
-- 파일을 고치기 전에 checkpoint 를 한 번 호출한다. 사용자는 브라우저의 [되돌리기] 나 undo 도구로 그 시점에 돌아갈 수 있다.
-- 새 페이지를 만들었거나 지금 보이지 않는 페이지를 고쳤으면 open_page 로 브라우저에 보여준다.
+- When you start design work, call get_context to see the design folder path, pages, assets, design system, the visible page and the selected element.
+- When the user says "this", "here" or "the selected one", they mean get_context's selection. The visible page is currentPage.
+- Edit design files directly in the design folder with your own file tools. The browser redraws as soon as a file is saved.
+- Call checkpoint once before editing files. The user can return to that point with Undo in the browser or the undo tool.
+- If you created a page or edited one that is not visible, show it with open_page.
 
-디자인 규칙:
+Design rules:

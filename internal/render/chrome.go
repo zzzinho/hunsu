@@ -106,7 +106,7 @@ func capture(d *devtools, pageURL string, width, maxHeight int) ([]byte, error) 
 		return nil, err
 	}
 	if navigated.ErrorText != "" {
-		return nil, fmt.Errorf("%s 을 열지 못했다: %s", pageURL, navigated.ErrorText)
+		return nil, fmt.Errorf("could not open %s: %s", pageURL, navigated.ErrorText)
 	}
 	if err := d.waitFor("Page.loadEventFired"); err != nil {
 		return nil, err
@@ -186,7 +186,7 @@ func (d *devtools) waitFor(event string) error {
 func (d *devtools) read() (incoming, error) {
 	line, err := d.r.ReadBytes(0)
 	if err != nil {
-		return incoming{}, errors.Join(errors.New("Chrome 연결이 끊겼다"), err)
+		return incoming{}, errors.Join(errors.New("lost the connection to Chrome"), err)
 	}
 	var in incoming
 	err = json.Unmarshal(line[:len(line)-1], &in)

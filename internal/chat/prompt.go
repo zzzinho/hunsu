@@ -45,33 +45,33 @@ type promptInput struct {
 func userPrompt(in promptInput) string {
 	var b strings.Builder
 	if in.turn.Page != "" {
-		fmt.Fprintf(&b, "[현재 페이지] %s\n", in.turn.Page)
+		fmt.Fprintf(&b, "[Current page] %s\n", in.turn.Page)
 	}
 	if len(in.edited) > 0 {
-		fmt.Fprintf(&b, "[알림] 마지막 응답 이후 사용자가 직접 고친 파일: %s. 고치기 전에 다시 읽어라.\n", strings.Join(in.edited, ", "))
+		fmt.Fprintf(&b, "[Notice] Files the user edited since your last reply: %s. Re-read them before editing.\n", strings.Join(in.edited, ", "))
 	}
 	in.design.write(&b)
 	if len(in.assets) > 0 {
-		fmt.Fprintf(&b, "[에셋] %s\n", strings.Join(in.assets, ", "))
+		fmt.Fprintf(&b, "[Assets] %s\n", strings.Join(in.assets, ", "))
 	}
 	if s := in.turn.Selection; s != nil {
-		fmt.Fprintf(&b, "[선택한 요소] %s\n%s\n", s.Selector, truncate(s.HTML, selectionLimit))
+		fmt.Fprintf(&b, "[Selected element] %s\n%s\n", s.Selector, truncate(s.HTML, selectionLimit))
 	}
 	if in.variant != "" {
-		fmt.Fprintf(&b, "[비교안] %s\n", in.variant)
+		fmt.Fprintf(&b, "[Variant] %s\n", in.variant)
 	}
-	fmt.Fprintf(&b, "[요청] %s", in.turn.Prompt)
+	fmt.Fprintf(&b, "[Request] %s", in.turn.Prompt)
 	return b.String()
 }
 
 func (d designSection) write(b *strings.Builder) {
 	if len(d.files) == 0 {
 		if d.whole {
-			b.WriteString("[디자인 시스템] 아직 없다\n")
+			b.WriteString("[Design system] none yet\n")
 		}
 		return
 	}
-	b.WriteString("[디자인 시스템]\n")
+	b.WriteString("[Design system]\n")
 	for _, name := range project.DesignSystemFiles() {
 		if data, ok := d.files[name]; ok {
 			fmt.Fprintf(b, "<%s>\n%s\n</%s>\n", name, data, name)
