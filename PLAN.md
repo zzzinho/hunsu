@@ -177,8 +177,8 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 - 요청·checkpoint·복원 직전에 편집 대상 파일 전체를 `.hunsu/history/<순번>/` 에 복사한다. 되돌리면 그 뒤에 생긴 파일은 지운다. 최근 50개만 남긴다. 버전은 마일스톤 10.
 - 파일 API 는 편집 대상 이름 규칙 + 일반 파일만 + `os.Root` 로 폴더 밖을 막는다.
-- 서버는 `127.0.0.1` 만 받는다. `/mcp` 는 토큰, `/api/ui` 는 출처 검사.
-- 계획(마일스톤 4): 나머지 API 에 토큰·Host·Origin 검사 (CSRF, DNS rebinding).
+- 서버는 `127.0.0.1` 만 받는다. 모든 요청에 Host 검사(DNS rebinding)와 Origin 검사(CSRF). `/mcp` 는 토큰, `/api/ui` 는 출처가 없어도 거부한다.
+- 렌더용 서빙(`/p/*`, `/variant/*`)은 페이지·디자인 시스템·에셋만 준다.
 - 한계: iframe 이 같은 출처라 디자인 JS 가 API 를 부를 수 있다. 외부 HTML 을 들일 때 포트를 분리한다.
 
 ## 10. 마일스톤
@@ -204,7 +204,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 **v1 마무리** (기능 뒤)
 
 - [x] 5. 영어 UI: 화면 문구는 `web/i18n.mjs` 사전(영어 기본, 한국어). 파일 패널 위 언어 선택으로 고르고 브라우저에 기억한다. 서버의 오류·터미널 출력·프롬프트 라벨·지시문·MCP 설명은 영어. 화면에 보이는 서버 오류는 `{"code","message"}` 로 받아 화면이 코드로 번역한다. LLM 은 사용자가 쓴 언어로 답한다. 모델은 provider 가 이름과 빠름 여부(`Model.Fast`)만 알리고 문구는 화면이 붙인다. 버전 이름은 종류(`kind`)·요청 내용·번호로 남기고 화면이 문구로 바꾼다
-- [ ] 4. 보안·설치: 나머지 API 에 Host·Origin 검사. provider 계약에 `Status()`(설치·로그인 확인, 안내 명령). universal 바이너리를 GitHub Release 와 Homebrew tap 으로 배포. `/p/*` 가 `.hunsu/`·디렉터리 목록까지 서빙하는 범위 정리. MCP `initialize` 가 요청 버전을 그대로 돌려주는 협상 검토
+- [x] 4. 보안·설치: 모든 요청에 Host 검사(호스트 이름이 127.0.0.1·localhost 가 아니면 거부, DNS rebinding)와 Origin 검사(있는데 자기 출처가 아니면 거부, CSRF. 없으면 브라우저가 아닌 로컬 프로그램으로 보고 받는다). `/p/*`·`/variant/*` 는 디자인 파일(페이지·디자인 시스템·에셋)만 주고 `.hunsu/`·디렉터리 목록은 주지 않는다. provider 계약에 `Status()`(설치·로그인, 고칠 명령), 화면과 터미널에 알린다. MCP `initialize` 는 아는 버전이면 그대로, 모르면 최신 버전으로 답한다. 배포는 태그를 push 하면 GitHub Actions 가 universal 바이너리를 Release 에 올리고 Homebrew tap(`zzzinho/homebrew-hunsu`) formula 를 갱신한다. tap 저장소와 토큰 준비는 사용자가 한다
 
 ## 11. 측정값 (2026-10-09, claude 2.1.295)
 

@@ -33,6 +33,8 @@ type fakeProvider struct {
 	release  chan struct{}
 }
 
+func (f *fakeProvider) Status(context.Context) llm.Status { return llm.Status{Ready: true} }
+
 func (f *fakeProvider) Name() string { return cmp.Or(f.name, "fake") }
 
 func (f *fakeProvider) Models() []llm.Model {
@@ -295,6 +297,12 @@ func TestService(t *testing.T) {
 				return f.lastRequest().Tools.URL
 			},
 			hunsuTools.URL},
+		{"provider 의 이름과 지금 쓸 수 있는지를 알려준다",
+			func(f *fixture) string {
+				status := f.svc.Status(context.Background())
+				return fmt.Sprint(status.Provider, " ", status.Ready)
+			},
+			"fake true"},
 		{"고른 모델로 보낸다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "고쳐", Model: "slow"})

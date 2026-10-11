@@ -173,6 +173,7 @@ body.resizing-y { cursor: row-resize; }
 #messages li { padding: 7px 10px; border-radius: 8px; white-space: pre-wrap; max-width: 88%; }
 #messages .user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); }
 #messages .assistant { background: var(--ink-700); border: 1px solid var(--ink-600); }
+#messages .notice { max-width: none; border: 1px solid var(--accent); color: var(--text); }
 #messages .progress { display: flex; gap: 8px; align-items: center; padding: 0 4px; color: var(--text-muted); font-size: 12px; }
 #messages .progress .elapsed { font-variant-numeric: tabular-nums; }
 #messages .progress .elapsed:not(:empty)::before { content: "· "; }

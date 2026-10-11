@@ -63,6 +63,29 @@ func TestEditable(t *testing.T) {
 	}
 }
 
+func TestIsDesignFile(t *testing.T) {
+	tests := []struct {
+		name string
+		path string
+		want bool
+	}{
+		{"페이지는 디자인 파일이다", "index.html", true},
+		{"디자인 시스템은 디자인 파일이다", "design.css", true},
+		{"assets 폴더의 이미지·폰트는 디자인 파일이다", "assets/logo.png", true},
+		{"hunsu 의 상태 폴더는 디자인 파일이 아니다", ".hunsu/session", false},
+		{"그 밖의 파일은 디자인 파일이 아니다", "notes.txt", false},
+		{"assets 폴더의 이미지·폰트가 아닌 파일은 디자인 파일이 아니다", "assets/notes.txt", false},
+		{"폴더는 디자인 파일이 아니다", "", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := project.IsDesignFile(tt.path); got != tt.want {
+				t.Errorf("IsDesignFile(%q) = %v, want %v", tt.path, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestProject_List(t *testing.T) {
 	tests := []struct {
 		name  string

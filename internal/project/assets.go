@@ -29,6 +29,11 @@ var assetTypes = map[string]string{
 // AssetType 은 에셋의 MIME 타입이다. 에셋이 아니면 빈 문자열이다.
 func AssetType(name string) string { return assetTypes[strings.ToLower(filepath.Ext(name))] }
 
+// IsDesignFile 은 렌더에 쓰는 파일인지다: 페이지, 디자인 시스템, assets/ 의 에셋. 경로는 / 로 나눈다.
+func IsDesignFile(name string) bool {
+	return Editable(name) || (path.Dir(name) == assetDir && isAsset(path.Base(name)))
+}
+
 func isAsset(name string) bool {
 	return filepath.Base(name) == name && !strings.HasPrefix(name, ".") && AssetType(name) != ""
 }

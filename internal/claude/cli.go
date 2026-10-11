@@ -3,6 +3,7 @@ package claude
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os/exec"
 	"slices"
@@ -22,6 +23,20 @@ var models = []llm.Model{{ID: "opus", Label: "opus"}, {ID: "sonnet", Label: "son
 func (CLI) Name() string { return "claude" }
 
 func (CLI) Models() []llm.Model { return slices.Clone(models) }
+
+func (c CLI) Status(ctx context.Context) llm.Status {
+	if _, err := exec.LookPath(c.Path); err != nil {
+		return llm.Status{Problem: llm.NotInstalled, Fix: "brew install --cask claude-code"}
+	}
+	out, _ := exec.CommandContext(ctx, c.Path, "auth", "status", "--json").Output()
+	var auth struct {
+		LoggedIn bool `json:"loggedIn"`
+	}
+	if json.Unmarshal(out, &auth) != nil || !auth.LoggedIn {
+		return llm.Status{Problem: llm.NotLoggedIn, Fix: "claude auth login"}
+	}
+	return llm.Status{Ready: true}
+}
 
 func (c CLI) Run(ctx context.Context, req llm.Request, emit func(llm.Event)) error {
 	var stderr bytes.Buffer

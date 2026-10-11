@@ -27,6 +27,11 @@ func (s *Server) sendChat(w http.ResponseWriter, r *http.Request) {
 
 const errorKind = "error"
 
+func (s *Server) status(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s.chat.Status(r.Context()))
+}
+
 func (s *Server) models(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(s.chat.Models())

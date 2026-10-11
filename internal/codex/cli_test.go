@@ -45,6 +45,29 @@ func TestCLI_Run(t *testing.T) {
 	}
 }
 
+func TestCLI_Status(t *testing.T) {
+	tests := []struct {
+		name   string
+		script string
+		want   llm.Status
+	}{
+		{"설치하고 로그인했으면 쓸 수 있다", "login-ok.sh", llm.Status{Ready: true}},
+		{"로그인하지 않았으면 로그인 명령을 알린다", "login-no.sh", llm.Status{Problem: llm.NotLoggedIn, Fix: "codex login"}},
+		{"설치하지 않았으면 설치 명령을 알린다", "none.sh", llm.Status{Problem: llm.NotInstalled, Fix: "brew install --cask codex"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			path, err := filepath.Abs(filepath.Join("testdata", tt.script))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := (codex.CLI{Path: path}).Status(t.Context()); got != tt.want {
+				t.Errorf("Status() = %+v, want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestCLI_Models(t *testing.T) {
 	tests := []struct {
 		name string

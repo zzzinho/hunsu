@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"hunsu/internal/chat"
@@ -27,7 +28,8 @@ import (
 	"hunsu/internal/ui"
 )
 
-const version = "0.1.0"
+// 배포 빌드가 -ldflags "-X main.version=..." 로 태그 버전을 넣는다.
+var version = "dev"
 
 //go:embed web
 var webFiles embed.FS
@@ -37,7 +39,12 @@ func main() {
 	// MCP 클라이언트에 등록한 주소가 실행할 때마다 바뀌지 않도록 포트를 고정한다.
 	port := flag.Int("port", 7777, "server port")
 	providerName := flag.String("provider", "", "LLM for the browser chat: claude or codex. Defaults to the first installed of claude, codex")
+	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
+	if *showVersion {
+		fmt.Println("hunsu", version)
+		return
+	}
 	if err := run(cmp.Or(flag.Arg(0), "."), *port, !*noOpen, *providerName); err != nil {
 		fmt.Fprintln(os.Stderr, "hunsu:", err)
 		os.Exit(1)
@@ -91,10 +98,13 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 	if renderer == nil {
 		fmt.Println("Chrome not found: screenshots, PNG export and version thumbnails are off")
 	}
+	if status := llmProvider.Status(context.Background()); !status.Ready {
+		fmt.Printf("%s is %s. Run: %s\n", llmProvider.Name(), strings.ReplaceAll(status.Problem, "-", " "), status.Fix)
+	}
 	if openBrowser {
 		exec.Command("open", url).Start()
 	}
-	return http.Serve(ln, mux)
+	return http.Serve(ln, server.Guard(mux))
 }
 
 // 브라우저 채팅을 처리할 LLM 을 고르는 유일한 곳이다. 다른 LLM 은 llm.Provider 를 구현한 뒤 여기에 더한다.
@@ -106,7 +116,7 @@ var providers = []struct {
 	{"codex", func(path string) llm.Provider { return codex.CLI{Path: path} }},
 }
 
-// name 이 비면 설치된 CLI 를 순서대로 찾는다. 아무것도 없으면 첫 provider 로 켜고, 요청할 때 실행 실패를 알린다.
+// name 이 비면 설치된 CLI 를 순서대로 찾는다. 아무것도 없으면 첫 provider 로 켜고, 상태 확인이 설치 방법을 알린다.
 func provider(name string) (llm.Provider, error) {
 	for _, p := range providers {
 		if name != "" && name != p.name {
@@ -123,7 +133,6 @@ func provider(name string) (llm.Provider, error) {
 	if name != "" {
 		return nil, fmt.Errorf("unknown provider %s (use claude or codex)", name)
 	}
-	fmt.Println("Neither claude nor codex found. Install and log in to one of them to use the browser chat")
 	return providers[0].make(providers[0].name), nil
 }
 

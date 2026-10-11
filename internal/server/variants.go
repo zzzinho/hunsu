@@ -56,7 +56,7 @@ func (s *Server) discardVariants(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// 안에는 디자인 파일만 있으므로, 없는 파일(에셋)은 디자인 폴더에서 준다.
+// 안에는 페이지와 디자인 시스템만 있으므로, 없는 파일(에셋)은 디자인 폴더에서 준다.
 func (s *Server) variantFile(w http.ResponseWriter, r *http.Request) {
 	id, err := strconv.Atoi(r.PathValue("id"))
 	if err != nil {
@@ -68,8 +68,8 @@ func (s *Server) variantFile(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	prefix := "/variant/" + r.PathValue("id")
-	noStore(http.StripPrefix(prefix, http.FileServerFS(overlay{top: files, base: s.project.FS()}))).ServeHTTP(w, r)
+	prefix := "/variant/" + r.PathValue("id") + "/"
+	http.StripPrefix(prefix, designFiles(overlay{top: files, base: s.project.FS()})).ServeHTTP(w, r)
 }
 
 type overlay struct {

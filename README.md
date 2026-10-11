@@ -20,16 +20,23 @@ HTML 로 디자인하는 로컬 디자인 도구. 렌더 화면을 보며 원본
 - macOS
 - 브라우저 채팅의 LLM: [Claude Code](https://claude.com/claude-code) CLI(`claude`) 또는 [Codex](https://github.com/openai/codex) CLI(`codex`), 로그인 상태
 - Chrome (선택): LLM 이 렌더 결과를 보고 확인한다. Chromium·Edge·Brave 도 된다. 없으면 이 기능만 꺼진다
-- Go 1.27+: 빌드할 때만
+- Go 1.27+: 소스로 빌드할 때만
+
+## 설치
+
+```bash
+brew install zzzinho/hunsu/hunsu
+```
+
+소스로 빌드하려면 Go 1.27+ 로 `go build -o hunsu .`.
 
 ## 실행
 
 ```bash
-go build -o hunsu .
-./hunsu ~/designs      # 생략하면 현재 디렉터리
+hunsu ~/designs      # 생략하면 현재 디렉터리
 ```
 
-`http://127.0.0.1:7777` 에 뜨고 브라우저가 열린다. `-port 8888` 로 포트 변경, `-no-open` 으로 브라우저 열기 생략. `-provider codex` 로 LLM 을 고른다(생략하면 설치된 것을 claude → codex 순으로).
+`http://127.0.0.1:7777` 에 뜨고 브라우저가 열린다. `-port 8888` 로 포트 변경, `-no-open` 으로 브라우저 열기 생략. `-provider codex` 로 LLM 을 고른다(생략하면 설치된 것을 claude → codex 순으로). 설치·로그인이 안 됐으면 터미널과 채팅 창에 실행할 명령을 알린다.
 
 ## 사용법
 
@@ -150,6 +157,8 @@ Chrome 이 있으면 provider 에게 `screenshot` 도구만 둔 MCP 서버(`/mcp
 go test ./... && node --test web/
 ```
 
+릴리스: `v*` 태그를 push 하면 GitHub Actions 가 universal 바이너리를 Release 에 올린다. `HOMEBREW_TAP_TOKEN` 비밀값이 있으면 `<owner>/homebrew-hunsu` 의 formula 도 갱신한다.
+
 | 경로 | 책임 |
 |---|---|
 | `main.go` | 조립: 실행 인자, provider 선택, 서버 시작 |
@@ -170,7 +179,7 @@ go test ./... && node --test web/
 
 ## 한계
 
-- 브라우저용 API 의 localhost 보호가 일부만 적용됐다 (`/mcp` 토큰, `/api/ui` 출처 검사). 나머지는 v1 마무리 단계.
+- 렌더 화면(iframe)이 hunsu 와 같은 출처라, 디자인 페이지의 JS 는 hunsu API 를 부를 수 있다. 믿을 수 없는 HTML 은 열지 않는다.
 - 에이전트가 `open_page` 없이 만든 페이지는 다음 조작 때 목록에 나타난다.
 - macOS 만 확인했다. 루트의 `.html` 만 페이지로 다룬다.
 - 페이지 JS 가 실행 중에 붙인 클래스·id 가 선택 경로에 들어가면 LLM 수정이 적용되지 않을 수 있다.

@@ -24,6 +24,8 @@ import (
 
 type startProvider struct{}
 
+func (startProvider) Status(context.Context) llm.Status { return llm.Status{Ready: true} }
+
 func (startProvider) Name() string { return "start" }
 
 func (startProvider) Models() []llm.Model { return []llm.Model{{ID: "fast", Label: "빠름"}} }
@@ -46,7 +48,7 @@ func newServer(t *testing.T) (http.Handler, string, *ui.Hub) {
 
 func newServerWith(t *testing.T, renderer server.Renderer) (http.Handler, string, *ui.Hub) {
 	t.Helper()
-	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "index.html": "index", "notes.txt": "notes.txt"})
+	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "index.html": "index", "notes.txt": "notes.txt", "assets/logo.png": "logo", ".hunsu/note": "secret"})
 	svc, err := chat.New(p, startProvider{}, chat.Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -75,7 +77,7 @@ func TestServer_API(t *testing.T) {
 		{"없는 파일은 없다고 알린다", "GET", "/api/file?path=none.html", "", 404, "", ""},
 		{"오류는 화면이 번역할 코드와 함께 JSON 으로 알린다", "POST", "/api/undo", "", 409, `{"code":"nothing-to-undo","message":"nothing to undo"}`, "Content-Type: application/json"},
 		{"이미 있는 파일은 새로 만들지 않는다", "POST", "/api/file?path=page.html", "", 409, "", ""},
-		{"에셋을 올린다", "POST", "/api/assets?name=logo.png", "png", 201, "", ""},
+		{"에셋을 올린다", "POST", "/api/assets?name=new.png", "png", 201, "", ""},
 		{"이미지·폰트가 아닌 에셋은 거부한다", "POST", "/api/assets?name=a.js", "js", 415, "", ""},
 		{"10MB 를 넘는 에셋은 거부한다", "POST", "/api/assets?name=big.png", strings.Repeat("x", project.MaxAssetSize+1), 413, "", ""},
 		{"디자인 폴더를 ZIP 으로 내보낸다", "GET", "/api/export/zip", "", 200, "page.html", "Content-Type: application/zip"},
@@ -92,11 +94,16 @@ func TestServer_API(t *testing.T) {
 		{"고를 비교안이 없으면 고르지 않는다", "POST", "/api/variants/choose?id=1", "", 409, "", ""},
 		{"비교안을 버린다", "POST", "/api/variants/discard", "", 204, "", ""},
 		{"없는 안의 파일은 없다고 알린다", "GET", "/variant/1/page.html", "", 404, "", ""},
-		{"렌더용 프로젝트 파일은 캐시 없이 준다", "GET", "/p/page.html", "", 200, "page.html", "Cache-Control: no-store"},
+		{"렌더용 디자인 파일은 캐시 없이 준다", "GET", "/p/page.html", "", 200, "page.html", "Cache-Control: no-store"},
+		{"index.html 도 다른 주소로 돌리지 않고 그대로 준다", "GET", "/p/index.html", "", 200, "index", ""},
+		{"렌더용으로 hunsu 의 상태 폴더는 주지 않는다", "GET", "/p/.hunsu/note", "", 404, "", ""},
+		{"렌더용으로 디자인 파일이 아닌 파일은 주지 않는다", "GET", "/p/notes.txt", "", 404, "", ""},
+		{"렌더용으로 폴더 목록은 주지 않는다", "GET", "/p/", "", 404, "", ""},
 		{"채팅 요청의 진행 이벤트를 스트림으로 보낸다", "POST", "/api/chat", `{"prompt":"고쳐"}`, 200, `data: {"kind":"start"}`, "Content-Type: text/event-stream"},
 		{"빈 채팅 요청은 거부한다", "POST", "/api/chat", `{"prompt":""}`, 400, "", ""},
 		{"되돌릴 것이 없으면 거부한다", "POST", "/api/undo", "", 409, "", ""},
 		{"새 대화를 시작한다", "POST", "/api/chat/reset", "", 204, "", ""},
+		{"provider 의 이름과 지금 쓸 수 있는지를 준다", "GET", "/api/status", "", 200, `{"provider":"start","ready":true}`, ""},
 		{"provider 가 고를 수 있게 한 모델 목록을 준다", "GET", "/api/models", "", 200, `[{"id":"fast","label":"빠름"}]`, ""},
 	}
 	for _, tt := range tests {
@@ -145,8 +152,8 @@ func TestServer_VariantFiles(t *testing.T) {
 		wantBody string
 	}{
 		{"안의 파일을 준다", "/variant/1/page.html", "page.html"},
-		{"안에 없는 파일(에셋 등)은 디자인 폴더에서 준다", "/variant/2/notes.txt", "notes.txt"},
-		{"폴더 주소는 안의 index.html 을 준다", "/variant/1/", "index"},
+		{"안에 없는 에셋은 디자인 폴더에서 준다", "/variant/2/assets/logo.png", "logo"},
+		{"안의 index.html 을 준다", "/variant/1/index.html", "index"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
