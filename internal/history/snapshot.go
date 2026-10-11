@@ -38,15 +38,17 @@ func capture(p *project.Project, state *os.Root, dir string) (string, error) {
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-// restore 는 dir 에 복사해 둔 파일로 디자인 파일을 되돌린다. 그 뒤에 생긴 파일은 지운다.
+// restore 는 dir 에 복사해 둔 파일로 디자인 파일을 되돌린다. 그 뒤에 생긴 파일은 지우고, 디자인 파일이 아닌 것은 무시한다.
 func restore(p *project.Project, state *os.Root, dir string) error {
 	saved, err := fs.Glob(state.FS(), path.Join(dir, "*"))
 	if err != nil {
 		return err
 	}
-	savedNames := make([]string, len(saved))
-	for i, s := range saved {
-		savedNames[i] = path.Base(s)
+	var savedNames []string
+	for _, s := range saved {
+		if name := path.Base(s); project.Editable(name) {
+			savedNames = append(savedNames, name)
+		}
 	}
 	listing, err := p.List()
 	if err != nil {

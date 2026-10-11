@@ -46,7 +46,7 @@ func newServer(t *testing.T) (http.Handler, string, *ui.Hub) {
 
 func newServerWith(t *testing.T, renderer server.Renderer) (http.Handler, string, *ui.Hub) {
 	t.Helper()
-	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "notes.txt": "notes.txt"})
+	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "index.html": "index", "notes.txt": "notes.txt"})
 	svc, err := chat.New(p, startProvider{}, chat.Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +67,7 @@ func TestServer_API(t *testing.T) {
 		wantHeader string
 	}{
 		{"UI 를 준다", "GET", "/", "", 200, "<title>hunsu", ""},
-		{"파일 목록을 JSON 으로 준다", "GET", "/api/files", "", 200, `"pages":["page.html"]`, ""},
+		{"파일 목록을 JSON 으로 준다", "GET", "/api/files", "", 200, `"pages":["index.html","page.html"]`, ""},
 		{"파일 내용을 준다", "GET", "/api/file?path=page.html", "", 200, "page.html", ""},
 		{"파일을 저장한다", "PUT", "/api/file?path=page.html", "saved", 204, "", ""},
 		{"템플릿으로 새 파일을 만든다", "POST", "/api/file?path=new.html", "", 201, "", ""},
@@ -85,6 +85,12 @@ func TestServer_API(t *testing.T) {
 		{"없는 버전으로는 복원하지 않는다", "POST", "/api/versions/restore?id=9", "", 404, "", ""},
 		{"버전 번호가 숫자가 아니면 거부한다", "POST", "/api/versions/restore?id=x", "", 400, "", ""},
 		{"썸네일이 없으면 없다고 알린다", "GET", "/api/versions/thumb?id=1", "", 404, "", ""},
+		{"비교안을 만들며 안 번호가 붙은 진행 이벤트를 스트림으로 보낸다", "POST", "/api/chat/variants", `{"prompt":"고쳐","count":2}`, 200, `"variant":1`, "Content-Type: text/event-stream"},
+		{"비교안 개수가 맞지 않으면 거부한다", "POST", "/api/chat/variants", `{"prompt":"고쳐","count":5}`, 400, "", ""},
+		{"고를 비교안 목록을 준다", "GET", "/api/variants", "", 200, "[]", ""},
+		{"고를 비교안이 없으면 고르지 않는다", "POST", "/api/variants/choose?id=1", "", 409, "", ""},
+		{"비교안을 버린다", "POST", "/api/variants/discard", "", 204, "", ""},
+		{"없는 안의 파일은 없다고 알린다", "GET", "/variant/1/page.html", "", 404, "", ""},
 		{"렌더용 프로젝트 파일은 캐시 없이 준다", "GET", "/p/page.html", "", 200, "page.html", "Cache-Control: no-store"},
 		{"채팅 요청의 진행 이벤트를 스트림으로 보낸다", "POST", "/api/chat", `{"prompt":"고쳐"}`, 200, `data: {"kind":"start"}`, "Content-Type: text/event-stream"},
 		{"빈 채팅 요청은 거부한다", "POST", "/api/chat", `{"prompt":""}`, 400, "", ""},
@@ -126,6 +132,29 @@ func TestServer_ExportPNG(t *testing.T) {
 			h.ServeHTTP(rec, httptest.NewRequest("GET", tt.target, nil))
 			if rec.Code != tt.wantStatus || !strings.Contains(rec.Body.String(), tt.wantBody) {
 				t.Errorf("GET %s = %d %q; want %d, %q 포함", tt.target, rec.Code, rec.Body, tt.wantStatus, tt.wantBody)
+			}
+		})
+	}
+}
+
+func TestServer_VariantFiles(t *testing.T) {
+	tests := []struct {
+		name     string
+		target   string
+		wantBody string
+	}{
+		{"안의 파일을 준다", "/variant/1/page.html", "page.html"},
+		{"안에 없는 파일(에셋 등)은 디자인 폴더에서 준다", "/variant/2/notes.txt", "notes.txt"},
+		{"폴더 주소는 안의 index.html 을 준다", "/variant/1/", "index"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, _, _ := newServer(t)
+			h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest("POST", "/api/chat/variants", strings.NewReader(`{"prompt":"고쳐","count":2}`)))
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest("GET", tt.target, nil))
+			if rec.Code != 200 || !strings.Contains(rec.Body.String(), tt.wantBody) {
+				t.Errorf("GET %s = %d %q; want 200, %q 포함", tt.target, rec.Code, rec.Body, tt.wantBody)
 			}
 		})
 	}

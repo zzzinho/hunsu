@@ -95,6 +95,11 @@
       <textarea name="prompt" rows="3" placeholder="무엇을 만들거나 고칠까요? (Enter 보내기, Shift+Enter 줄바꿈)" aria-label="요청"></textarea>
       <div class="actions">
         <select name="model" aria-label="모델"></select>
+        <select name="variants" aria-label="비교안" title="여러 안을 동시에 만들어 나란히 비교한다">
+          <option value="1">한 안</option>
+          <option value="2">2안 비교</option>
+          <option value="3">3안 비교</option>
+        </select>
         <button type="button" id="undo">되돌리기</button>
         <button type="button" id="versions-open">버전</button>
         <button type="button" id="new-chat">새 대화</button>
@@ -103,15 +108,25 @@
     </form>
   </section>
 </section>
-<dialog id="versions" aria-labelledby="versions-title">
+<dialog id="versions" class="sheet" aria-labelledby="versions-title">
   <header>
     <h2 id="versions-title">버전</h2>
     <button type="button" id="version-save">지금 상태 저장</button>
     <button type="button" class="icon" id="versions-close" aria-label="닫기">×</button>
   </header>
   <p class="hint">요청이 끝날 때마다 자동으로 남는다. 복원해도 [되돌리기] 로 돌아갈 수 있다.</p>
-  <p class="hint" id="version-note" role="status"></p>
+  <p class="hint note" id="version-note" role="status"></p>
   <ol id="version-list"></ol>
+</dialog>
+<dialog id="variants-dialog" class="sheet wide" aria-labelledby="variants-title">
+  <header>
+    <h2 id="variants-title">비교안</h2>
+    <button type="button" id="variants-discard">모두 버리기</button>
+    <button type="button" class="icon" id="variants-close" aria-label="닫기">×</button>
+  </header>
+  <p class="hint">고른 안이 지금 상태가 되고, 나머지 안도 버전에 남는다. [되돌리기] 로 고르기 전으로 돌아간다.</p>
+  <p class="hint note" id="variant-note" role="status"></p>
+  <ol id="variant-list"></ol>
 </dialog>
 <p id="status" role="status"></p>
 <script src="vendor/codemirror/codemirror.min.js"></script>

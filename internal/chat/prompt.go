@@ -34,22 +34,33 @@ func designUpdate(current map[string][]byte, edited []string, first bool) design
 	return designSection{files: files, whole: first}
 }
 
-func userPrompt(t Turn, edited []string, design designSection, assets []string) string {
+type promptInput struct {
+	turn    Turn
+	edited  []string
+	design  designSection
+	assets  []string
+	variant string
+}
+
+func userPrompt(in promptInput) string {
 	var b strings.Builder
-	if t.Page != "" {
-		fmt.Fprintf(&b, "[현재 페이지] %s\n", t.Page)
+	if in.turn.Page != "" {
+		fmt.Fprintf(&b, "[현재 페이지] %s\n", in.turn.Page)
 	}
-	if len(edited) > 0 {
-		fmt.Fprintf(&b, "[알림] 마지막 응답 이후 사용자가 직접 고친 파일: %s. 고치기 전에 다시 읽어라.\n", strings.Join(edited, ", "))
+	if len(in.edited) > 0 {
+		fmt.Fprintf(&b, "[알림] 마지막 응답 이후 사용자가 직접 고친 파일: %s. 고치기 전에 다시 읽어라.\n", strings.Join(in.edited, ", "))
 	}
-	design.write(&b)
-	if len(assets) > 0 {
-		fmt.Fprintf(&b, "[에셋] %s\n", strings.Join(assets, ", "))
+	in.design.write(&b)
+	if len(in.assets) > 0 {
+		fmt.Fprintf(&b, "[에셋] %s\n", strings.Join(in.assets, ", "))
 	}
-	if t.Selection != nil {
-		fmt.Fprintf(&b, "[선택한 요소] %s\n%s\n", t.Selection.Selector, truncate(t.Selection.HTML, selectionLimit))
+	if s := in.turn.Selection; s != nil {
+		fmt.Fprintf(&b, "[선택한 요소] %s\n%s\n", s.Selector, truncate(s.HTML, selectionLimit))
 	}
-	fmt.Fprintf(&b, "[요청] %s", t.Prompt)
+	if in.variant != "" {
+		fmt.Fprintf(&b, "[비교안] %s\n", in.variant)
+	}
+	fmt.Fprintf(&b, "[요청] %s", in.turn.Prompt)
 	return b.String()
 }
 

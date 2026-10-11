@@ -49,6 +49,11 @@ func (p *Project) FS() fs.FS { return p.root.FS() }
 
 func (p *Project) Dir() string { return p.dir }
 
+// StatePath 는 hunsu 상태 폴더(.hunsu) 안의 절대 경로다.
+func (p *Project) StatePath(elem ...string) string {
+	return filepath.Join(append([]string{p.dir, stateDir}, elem...)...)
+}
+
 func (p *Project) State() (*os.Root, error) {
 	if err := p.root.MkdirAll(stateDir, 0o755); err != nil {
 		return nil, err

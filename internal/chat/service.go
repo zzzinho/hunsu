@@ -47,6 +47,8 @@ type Service struct {
 	llm      llm.Provider
 	history  *history.History
 	timeline *history.Timeline
+	variants *history.Variants
+	pending  *variantRun
 	session  session
 	seen     map[string][32]byte
 	tools    *llm.MCPServer
@@ -68,11 +70,15 @@ func New(p *project.Project, provider llm.Provider, opts Options) (*Service, err
 	if err != nil {
 		return nil, err
 	}
+	variants, err := history.NewVariants(p)
+	if err != nil {
+		return nil, err
+	}
 	state, err := p.State()
 	if err != nil {
 		return nil, err
 	}
-	return &Service{project: p, llm: provider, history: h, timeline: timeline, session: newSession(state, provider.Name()), tools: opts.Tools}, nil
+	return &Service{project: p, llm: provider, history: h, timeline: timeline, variants: variants, session: newSession(state, provider.Name()), tools: opts.Tools}, nil
 }
 
 func (s *Service) Models() []llm.Model { return s.llm.Models() }
@@ -100,7 +106,7 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	edited := s.editedSinceLastReply(current)
 	req := llm.Request{
 		Dir:          s.project.Dir(),
-		Prompt:       userPrompt(t, edited, designUpdate(current, edited, s.seen == nil), before.Assets),
+		Prompt:       userPrompt(promptInput{turn: t, edited: edited, design: designUpdate(current, edited, s.seen == nil), assets: before.Assets}),
 		SystemPrompt: systemPrompt(),
 		SessionID:    s.session.load(),
 		Model:        cmp.Or(t.Model, s.defaultModel()),

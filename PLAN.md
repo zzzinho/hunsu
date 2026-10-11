@@ -199,7 +199,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 - [x] 9. 내보내기: 폴더 ZIP(디자인 시스템·페이지·에셋, `.hunsu/` 제외), 페이지별 단일 HTML(`design.css` 링크를 `<style>` 로, 에셋 경로를 data URI 로), PNG(렌더러, 높이 16,000px 까지). 화면 막대의 [내보내기] 메뉴에서 받는다. Chrome 이 없으면 PNG 는 이유를 알린다
 - [x] 10. 버저닝: 버전은 디자인 파일 전체의 저장본(시각·이름·대표 페이지·썸네일). 요청이 끝나면 요청 내용을 이름으로, 요청 전에 사용자가 고친 내용이 있으면 '요청 전' 으로, [버전 저장] 으로 남긴다. 직전 버전과 내용이 같으면 남기지 않는다. 아무 버전으로 복원하고, 복원 전 상태와 복원 결과도 버전으로 남는다. [되돌리기] 는 지금처럼 요청·checkpoint·복원 직전으로 돌아간다. 썸네일은 대표 페이지(새로 만든 페이지 → 보고 있던 페이지 → 첫 페이지)를 1280×800 으로 찍고, Chrome 이 없으면 없다. 에셋은 넣지 않는다. 버전은 최근 100개, 되돌리기 스냅샷은 최근 50개만 남긴다. MCP `undo` 설명을 맞춘다
 - [x] 11. Codex provider: `codex exec --json`(이어가기는 `exec resume`). 지시문은 `developer_instructions`, 도구는 `mcp_servers.hunsu`(자동 승인), 샌드박스는 `workspace-write`, 사용자 config·rules·프로젝트 AGENTS.md 는 끈다. 모델은 gpt-5.6-sol(기본)·terra·luna. provider 는 실행 인자 `-provider claude|codex` 로 고르고, 생략하면 설치된 것을 claude → codex 순으로 찾는다. 대화 ID 는 provider 별 파일(`.hunsu/session-<이름>`)
-- [ ] 12. 비교안(옵션): 입력창에서 [안 2개·3개] 를 고르면 디자인 파일을 안마다 `.hunsu/variants/<n>/` 에 복사하고 provider 를 병렬로 실행한다(새 대화, 안마다 '충실하게·과감하게·절제해서' 방향). 비교안 실행에는 도구를 주지 않는다(`screenshot` 은 원본 폴더를 찍는다). 그래서 도구는 provider 생성이 아니라 요청(`llm.Request.Tools`)으로 건넨다. 나란히 보고 고르면 그 안이 지금 상태가 되고, 나머지 안도 썸네일과 함께 버전에 남는다. [되돌리기] 로 고르기 전으로 돌아간다
+- [x] 12. 비교안(옵션): 입력창에서 [안 2개·3개] 를 고르면 디자인 파일을 안마다 `.hunsu/variants/<n>/` 에 복사하고 provider 를 병렬로 실행한다(새 대화, 안마다 '충실하게·과감하게·절제해서' 방향). 비교안 실행에는 도구를 주지 않는다(`screenshot` 은 원본 폴더를 찍는다). 그래서 도구는 provider 생성이 아니라 요청(`llm.Request.Tools`)으로 건넨다. 나란히 보고 고르면 그 안이 지금 상태가 되고, 나머지 안도 썸네일과 함께 버전에 남는다. [되돌리기] 로 고르기 전으로 돌아간다
 
 **v1 마무리** (기능 뒤)
 
