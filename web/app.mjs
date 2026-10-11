@@ -1,4 +1,4 @@
-import { modeOf, openFile, pageFileName, reactionTo, watchList } from './view.mjs';
+import { modeOf, openFile, pageFileName, pageFromPath, reactionTo, watchList } from './view.mjs';
 import { DEFAULT_SIZES, keyDelta, resize, togglePanel } from './layout.mjs';
 import { frameBox, zoomBy, zoomForKey, zoomStep, zoomText } from './zoom.mjs';
 import { elapsedText, parseSSE, stepText, variantsText } from './chat.mjs';
@@ -151,7 +151,9 @@ async function checkStatus() {
 async function loadModels() {
   const models = await (await request('/api/models')).json();
   const select = promptForm.elements.model;
+  const chosen = select.value;
   select.replaceChildren(...models.map((model, i) => new Option(modelLabel(model, i === 0), model.id)));
+  if (models.some((model) => model.id === chosen)) select.value = chosen;
   select.hidden = models.length === 0;
 }
 
@@ -184,9 +186,22 @@ function listenCommands() {
 
 async function openExisting() {
   const { pages, files } = await refreshList();
-  if (state.open && files.includes(state.open)) return;
+  const previewGone = state.preview && !pages.includes(state.preview);
+  if (state.open && files.includes(state.open) && !previewGone) return;
   if (pages.length) await open(pages[0]);
   else closeAll();
+}
+
+// 렌더 화면 안에서 링크로 다른 페이지에 가면 그 페이지를 연다. 디자인 밖으로 나가면 보던 페이지로 돌아온다.
+async function followFrame() {
+  if (!state.preview) return;
+  let page = null;
+  try {
+    page = pageFromPath(frame.contentWindow.location.pathname);
+  } catch {}
+  if (page === state.preview) return;
+  if (page) await open(page).catch(() => {});
+  if (page !== state.preview) frame.src = `/p/${encodeURIComponent(state.preview)}`;
 }
 
 async function create(path) {
@@ -194,8 +209,9 @@ async function create(path) {
   await open(path);
 }
 
+// 바뀐 것이 없으면 쓰지 않는다. LLM 이나 외부 에디터가 방금 쓴 내용을 다시 읽기 전 내용으로 덮어쓰지 않게.
 async function save() {
-  if (!state.open) return;
+  if (!state.open || editor.isClean()) return;
   await request(fileURL(state.open), { method: 'PUT', body: editor.getValue() });
   editor.markClean();
   showDirty();
@@ -517,6 +533,7 @@ function setZoom(next) {
 const isTyping = (target) => Boolean(target?.closest?.('input, textarea, select, [contenteditable], .CodeMirror'));
 
 function handleKey(event) {
+  if (event.target?.closest?.('dialog')) return;
   if (event.metaKey || event.ctrlKey) {
     const nextZoom = zoomForKey(event.key, zoom);
     if (event.key === '\\') switchPanel('focus');
@@ -597,7 +614,10 @@ $$('[data-resize]').forEach(connectResizer);
 $('#selection button').onclick = () => frameTools.clear();
 document.addEventListener('keydown', handleKey);
 acceptFileDrop(document);
-frame.addEventListener('load', () => acceptFileDrop(frame.contentDocument));
+frame.addEventListener('load', () => {
+  if (frame.contentDocument) acceptFileDrop(frame.contentDocument);
+  followFrame();
+});
 $('#export').ontoggle = () => {
   $$('[data-export][data-page]').forEach((button) => { button.disabled = !state.preview; });
 };
@@ -626,8 +646,11 @@ $('#version-save').onclick = () => noteErrors((async () => {
   $('#version-note').textContent = saved ? t('versions.saved') : t('versions.same');
 })());
 $('.upload input').onchange = async ({ target }) => {
-  await upload(target.files);
-  target.value = '';
+  try {
+    await upload(target.files);
+  } finally {
+    target.value = '';
+  }
 };
 $('#new-page').onsubmit = async (event) => {
   event.preventDefault();

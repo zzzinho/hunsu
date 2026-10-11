@@ -146,12 +146,20 @@ export function createFrameTools(frame, { onPick, onKey, onZoom, onEditText, can
     if (tool === 'select') {
       event.preventDefault();
       event.stopPropagation();
-      select(event.target);
+      // 본문 아래 빈 곳을 누르면 <html> 이 대상이다. 고를 요소가 없으니 선택을 푼다.
+      if (event.target === doc().documentElement) clear();
+      else select(event.target);
     } else if (suppressClick) {
       event.preventDefault();
       event.stopPropagation();
     }
     suppressClick = false;
+  }
+
+  function clear() {
+    selector = null;
+    place('hunsu-selected', null);
+    onPick(null, false);
   }
 
   function reposition() {
@@ -207,10 +215,6 @@ export function createFrameTools(frame, { onPick, onKey, onZoom, onEditText, can
       pan = null;
       applyTool();
     },
-    clear() {
-      selector = null;
-      place('hunsu-selected', null);
-      onPick(null, false);
-    },
+    clear,
   };
 }

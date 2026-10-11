@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { modeOf, openFile, pageFileName, reactionTo, watchList } from './view.mjs';
+import { modeOf, openFile, pageFileName, pageFromPath, reactionTo, watchList } from './view.mjs';
 
 async function table(t, rows, check) {
   for (const [name, ...args] of rows) await t.test(name, () => check(...args));
@@ -15,6 +15,13 @@ test('modeOf', (t) => table(t, [
   ['md 는 markdown 모드로 연다', 'DESIGN.md', 'markdown'],
   ['모르는 확장자는 일반 텍스트로 연다', 'notes.txt', null],
 ], (path, want) => assert.equal(modeOf(path), want)));
+
+test('pageFromPath', (t) => table(t, [
+  ['렌더 주소에서 페이지 파일 이름을 뽑는다', '/p/about.html', 'about.html'],
+  ['인코딩된 이름은 풀어서 돌려준다', '/p/my%20page.html', 'my page.html'],
+  ['페이지가 아닌 렌더 주소는 페이지로 보지 않는다', '/p/design.css', null],
+  ['렌더 주소가 아니면 페이지로 보지 않는다', 'blank', null],
+], (pathname, want) => assert.equal(pageFromPath(pathname), want)));
 
 test('pageFileName', (t) => table(t, [
   ['이름에 .html 을 붙여 페이지 파일 이름을 만든다', 'about', 'about.html'],
