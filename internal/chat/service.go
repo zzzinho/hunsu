@@ -73,10 +73,11 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	if err := s.history.Save(); err != nil {
 		return err
 	}
+	edited := s.editedSinceLastReply(current)
 	req := llm.Request{
 		Dir:          s.project.Dir(),
-		Prompt:       userPrompt(t, s.editedSinceLastReply(current)),
-		SystemPrompt: systemPrompt(current),
+		Prompt:       userPrompt(t, edited, designUpdate(current, edited, s.seen == nil)),
+		SystemPrompt: systemPrompt(),
 		SessionID:    s.session.load(),
 		Model:        cmp.Or(t.Model, s.defaultModel()),
 	}
@@ -129,6 +130,11 @@ func (s *Service) Checkpoint() error {
 }
 
 func (s *Service) Reset() error {
+	if !s.mu.TryLock() {
+		return ErrBusy
+	}
+	defer s.mu.Unlock()
+	s.seen = nil
 	return s.session.reset()
 }
 

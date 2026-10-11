@@ -9,8 +9,6 @@ func Args(r llm.Request) []string {
 		"--safe-mode", "--strict-mcp-config",
 		"--restricted", "--tools", "Read,Edit,Write", "--permission-mode", "acceptEdits",
 		"--append-system-prompt", r.SystemPrompt,
-		// 기본값(on)이면 resume 할 때 처음 디자인 규칙이 계속 쓰인다.
-		"--system-prompt-snapshot", "off",
 		"--output-format", "stream-json", "--verbose",
 		// 큰 파일은 다 쓰는 데 1분 넘게 걸린다. 그동안의 진행을 보여주려면 조각 단위 이벤트가 필요하다 (PLAN.md 11).
 		"--include-partial-messages",

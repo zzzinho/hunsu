@@ -74,6 +74,10 @@ func (f *fixture) send(turn chat.Turn) string {
 
 func (f *fixture) lastRequest() llm.Request { return f.runner.requests[len(f.runner.requests)-1] }
 
+func (f *fixture) warmUp() { f.send(chat.Turn{Prompt: "준비"}) }
+
+const designBlock = "[디자인 시스템]\n<design.css>\n:root { --color-primary: red; }\n</design.css>\n"
+
 func (f *fixture) must(err error) {
 	f.t.Helper()
 	if err != nil {
@@ -107,18 +111,21 @@ func TestService(t *testing.T) {
 			"error:" + chat.ErrEmptyPrompt.Error()},
 		{"현재 페이지와 요청을 프롬프트로 보낸다",
 			func(f *fixture) string {
+				f.warmUp()
 				f.send(chat.Turn{Page: "a.html", Prompt: "더 크게"})
 				return f.lastRequest().Prompt
 			},
 			"[현재 페이지] a.html\n[요청] 더 크게"},
 		{"열린 페이지가 없으면 요청만 보낸다",
 			func(f *fixture) string {
+				f.warmUp()
 				f.send(chat.Turn{Prompt: "랜딩 페이지 만들어줘"})
 				return f.lastRequest().Prompt
 			},
 			"[요청] 랜딩 페이지 만들어줘"},
 		{"선택한 요소의 위치와 HTML 을 함께 보낸다",
 			func(f *fixture) string {
+				f.warmUp()
 				f.send(chat.Turn{Page: "a.html", Prompt: "더 크게",
 					Selection: &ui.Selection{Selector: "main > button.cta", HTML: `<button class="cta">시작</button>`}})
 				return f.lastRequest().Prompt
@@ -138,10 +145,65 @@ func TestService(t *testing.T) {
 				return f.lastRequest().Prompt
 			},
 			"[알림] 마지막 응답 이후 사용자가 직접 고친 파일: a.html. 고치기 전에 다시 읽어라.\n[요청] 2"},
-		{"디자인 시스템 내용을 system prompt 로 보낸다",
+		{"대화의 첫 요청에는 디자인 시스템 전체를 요청 끝에 붙인다",
 			func(f *fixture) string {
+				f.send(chat.Turn{Page: "a.html", Prompt: "고쳐"})
+				return f.lastRequest().Prompt
+			},
+			"[현재 페이지] a.html\n" + designBlock + "[요청] 고쳐"},
+		{"디자인 시스템이 없으면 첫 요청에 없다고 알린다",
+			func(f *fixture) string {
+				f.must(f.project.Remove("design.css"))
 				f.send(chat.Turn{Prompt: "고쳐"})
-				return fmt.Sprint(strings.Contains(f.lastRequest().SystemPrompt, "--color-primary: red"))
+				return f.lastRequest().Prompt
+			},
+			"[디자인 시스템] 아직 없다\n[요청] 고쳐"},
+		{"바뀌지 않은 디자인 시스템은 다시 보내지 않는다",
+			func(f *fixture) string {
+				f.warmUp()
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.lastRequest().Prompt
+			},
+			"[요청] 고쳐"},
+		{"사용자가 고친 디자인 시스템 파일은 바뀐 내용을 붙인다",
+			func(f *fixture) string {
+				f.warmUp()
+				f.must(f.project.Write("design.css", []byte(":root { --color-primary: blue; }")))
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.lastRequest().Prompt
+			},
+			"[알림] 마지막 응답 이후 사용자가 직접 고친 파일: design.css. 고치기 전에 다시 읽어라.\n[디자인 시스템]\n<design.css>\n:root { --color-primary: blue; }\n</design.css>\n[요청] 고쳐"},
+		{"LLM 이 직접 고친 디자인 시스템은 다시 보내지 않는다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"design.css": ":root { --color-primary: green; }"}
+				f.warmUp()
+				f.runner.writes = nil
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.lastRequest().Prompt
+			},
+			"[요청] 고쳐"},
+		{"새 대화를 시작하면 첫 요청에 디자인 시스템 전체를 다시 붙인다",
+			func(f *fixture) string {
+				f.warmUp()
+				f.must(f.svc.Reset())
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.lastRequest().Prompt
+			},
+			designBlock + "[요청] 고쳐"},
+		{"서버를 다시 켜면 첫 요청에 디자인 시스템 전체를 다시 붙인다",
+			func(f *fixture) string {
+				f.warmUp()
+				f.restart()
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.lastRequest().Prompt
+			},
+			designBlock + "[요청] 고쳐"},
+		{"system prompt 는 디자인 시스템이 바뀌어도 그대로라 캐시를 깨지 않는다",
+			func(f *fixture) string {
+				f.warmUp()
+				f.must(f.project.Write("design.css", []byte(":root { --color-primary: blue; }")))
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return fmt.Sprint(f.runner.requests[0].SystemPrompt == f.lastRequest().SystemPrompt)
 			},
 			"true"},
 		{"고른 모델로 보낸다",

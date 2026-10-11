@@ -61,7 +61,7 @@ Click an element with the select tool (V); a selection chip appears above the in
 | `design.css` | CSS variables and shared classes, linked by every page |
 | `DESIGN.md` | Rules in prose, followed by the LLM |
 
-Both are pinned at the top of the file panel (click to create if missing) and sent to the LLM with every request.
+Both are pinned at the top of the file panel (click to create if missing) and sent to the LLM on the first request of a conversation and whenever they change.
 
 **Edit directly**: edit in the source editor and press ⌘S. Edits from other editors show up within 0.5 s and are reported to the LLM on the next request.
 

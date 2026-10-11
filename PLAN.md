@@ -100,8 +100,7 @@ hunsu 는 특정 LLM·에이전트를 전제하지 않는다. `claude -p` 는 Po
 ```
 claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
   --tools "Read,Edit,Write" --permission-mode acceptEdits
-  --append-system-prompt "<지시문 + 디자인 규칙 + DESIGN.md + design.css>"
-  --system-prompt-snapshot off
+  --append-system-prompt "<지시문 + 디자인 규칙>"
   --output-format stream-json --verbose --include-partial-messages [--model <id>]
 ```
 
@@ -110,7 +109,6 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | `--safe-mode`, `--strict-mcp-config` | 사용자 설정·hook·MCP 를 섞지 않는다. 2배 빠르고 10배 싸다 |
 | `--restricted`, `--tools` | 명령 실행 없이 디자인 폴더 안 파일만 다룬다 |
 | `--resume` | `system/init` 의 `session_id` 로 대화를 잇는다 |
-| `--system-prompt-snapshot off` | 기본값이면 resume 때 첫 디자인 규칙이 계속 쓰인다 |
 | `--include-partial-messages` | 큰 파일을 쓰는 동안(opus 80초) 진행을 보여준다 |
 
 - 프롬프트는 표준 입력으로 넘긴다. `-` 로 시작하는 요청이 플래그로 해석되지 않게.
@@ -124,7 +122,9 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 ```
 [현재 페이지] landing.html
-[알림] 마지막 응답 이후 사용자가 직접 고친 파일: landing.html. 고치기 전에 다시 읽어라.
+[알림] 마지막 응답 이후 사용자가 직접 고친 파일: design.css. 고치기 전에 다시 읽어라.
+[디자인 시스템]
+<design.css>…</design.css>
 [선택한 요소] main > section.hero > button.cta
 <button class="cta">시작하기</button>
 [요청] 더 크게
@@ -132,7 +132,8 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 - `[알림]`: 응답 직후 파일 해시를 기억하고 달라진 파일을 알린다. 되돌리기도 포함. 없으면 예전 내용으로 Edit 하다 실패해 6초가 17초가 된다.
 - 선택한 요소의 HTML 은 2000자까지.
-- 디자인 시스템은 매 요청 system prompt 로 넣는다. 지시문은 `internal/chat/instructions.md`, 디자인 규칙은 `internal/project/rules.md`.
+- **고정된 것은 앞, 바뀌는 것은 뒤.** 프롬프트 캐시는 앞부분이 같아야 재사용된다. system prompt 는 지시문(`internal/chat/instructions.md`)과 디자인 규칙(`internal/project/rules.md`)만 두고 바뀌지 않는다.
+- `[디자인 시스템]`: 대화의 첫 요청(새 대화·서버 재시작 포함)에 전체를, 이후에는 사용자가 바꾼 파일만 붙인다. LLM 이 고친 내용은 다시 보내지 않는다.
 
 ## 7. 외부 에이전트 (MCP)
 
@@ -187,7 +188,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | 손으로 고친 파일을 이어 편집하나 | 된다. 수동 편집 보존. 다만 Edit 실패 후 재읽기로 17초 |
 | 폴더 밖 접근이 막히나 | 막힌다. 상대·절대 경로, 심볼릭 링크 모두 |
 | 디자인 규칙을 따르나 | 따른다. 새 요소에 `var(--...)` 12회, `design.css` 링크 자동 추가 |
-| 규칙 변경이 이어진 대화에 반영되나 | 기본값은 안 된다. `--system-prompt-snapshot off` 면 된다 |
+| 규칙 변경이 이어진 대화에 반영되나 | system prompt 에 두면 기본값으로는 안 된다. 메시지 끝에 붙이면 된다 |
 
 **작은 수정** ("버튼 배경을 초록색으로")
 
@@ -208,5 +209,14 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | haiku | 18초 | 25~40초 | - |
 
 빈 프로젝트에서는 없는 파일을 읽으려다 4초를 쓴다. 프롬프트에 파일 목록을 넣으면 줄일 수 있다.
+
+**프롬프트 캐시** (haiku, 대화 기록 약 1만 토큰, `design.css` 한 글자 변경)
+
+| 디자인 시스템 위치 | 캐시 재사용 | 새로 저장 |
+|---|---|---|
+| system prompt 안 (이전) | 2,149 | 8,770 |
+| 요청 메시지 끝 (현재) | 10,861 | 1,353 |
+
+캐시 저장 1.25배, 재사용 0.1배 단가 기준 약 4배 차이. 대화가 길수록 커진다. 바뀐 값도 정확히 반영한다.
 
 **MCP** (클라이언트: Claude Code, haiku): 선택 요소 색 변경 + 새 페이지 + 열기 14.7초. 도구 순서 `get_context` → `checkpoint` → 편집 → `open_page`. 브라우저 [되돌리기] 한 번으로 모두 복원. 토큰 없는 `/mcp` 401, 다른 출처 `/api/ui` 403.
