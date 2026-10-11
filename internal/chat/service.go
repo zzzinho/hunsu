@@ -65,7 +65,7 @@ func New(p *project.Project, provider llm.Provider, thumb history.Thumbnailer) (
 	if err != nil {
 		return nil, err
 	}
-	return &Service{project: p, llm: provider, history: h, timeline: timeline, session: session{state}}, nil
+	return &Service{project: p, llm: provider, history: h, timeline: timeline, session: newSession(state, provider.Name())}, nil
 }
 
 func (s *Service) Models() []llm.Model { return s.llm.Models() }

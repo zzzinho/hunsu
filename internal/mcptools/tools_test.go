@@ -18,6 +18,8 @@ import (
 
 type idleProvider struct{}
 
+func (idleProvider) Name() string { return "idle" }
+
 func (idleProvider) Models() []llm.Model { return nil }
 
 func (idleProvider) Run(context.Context, llm.Request, func(llm.Event)) error { return nil }
