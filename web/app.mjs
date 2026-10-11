@@ -4,6 +4,7 @@ import { frameBox, zoomBy, zoomForKey, zoomStep, zoomText } from './zoom.mjs';
 import { elapsedText, parseSSE, stepText } from './chat.mjs';
 import { createFrameTools } from './frame.mjs';
 import { toolForKey } from './tools.mjs';
+import { replaceText } from './textedit.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
@@ -25,6 +26,8 @@ const frameTools = createFrameTools(frame, {
   onPick: showSelection,
   onKey: handleKey,
   onZoom: (deltaY) => setZoom(zoomBy(zoom, deltaY)),
+  onEditText: (edit) => editText(edit),
+  canEdit: () => !running,
 });
 
 let state = { open: null, preview: null };
@@ -186,6 +189,23 @@ async function save() {
   await request(fileURL(state.open), { method: 'PUT', body: editor.getValue() });
   editor.markClean();
   showDirty();
+}
+
+function decodeHTML(raw) {
+  const box = document.createElement('textarea');
+  box.innerHTML = raw;
+  return box.value;
+}
+
+async function editText(edit) {
+  const page = state.preview;
+  if (state.open === page && !editor.isClean()) await save();
+  const next = replaceText(await readFile(page), edit, decodeHTML);
+  if (next === null) {
+    frame.contentWindow.location.reload();
+    throw new Error('원본에서 이 문구를 찾지 못해 반영하지 않았습니다. 페이지 JS 가 만든 문구일 수 있습니다');
+  }
+  await request(fileURL(page), { method: 'PUT', body: next });
 }
 
 async function reloadEditor(path) {

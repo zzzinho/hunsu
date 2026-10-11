@@ -1,11 +1,14 @@
 import { selectorFor } from './selector.mjs';
 import { isDrag, panPosition } from './tools.mjs';
+import { HIDDEN_TEXT } from './textedit.mjs';
 
 // 디자인 파일이 아니라 렌더된 문서에만 넣는다. 페이지 CSS 가 덮어쓰지 못하게 id 선택자로 지정한다.
 const OVERLAY_CSS = `
 #hunsu-hover, #hunsu-selected { position: fixed; display: none; pointer-events: none; z-index: 2147483647; box-sizing: border-box; border-radius: 2px; }
 #hunsu-hover { border: 1px solid #e0a64b; background: rgb(224 166 75 / 10%); }
 #hunsu-selected { border: 2px solid #e0a64b; }
+[data-hunsu-editing] { outline: 2px solid #e0a64b !important; outline-offset: 2px; }
+[data-hunsu-editing], [data-hunsu-editing] * { cursor: text !important; user-select: text !important; }
 `;
 
 const CURSOR_CSS = {
@@ -14,11 +17,12 @@ const CURSOR_CSS = {
   panning: '*, *::before, *::after { cursor: grabbing !important; user-select: none !important; }',
 };
 
-export function createFrameTools(frame, { onPick, onKey, onZoom }) {
+export function createFrameTools(frame, { onPick, onKey, onZoom, onEditText, canEdit }) {
   let tool = 'select';
   let selector = null;
   let pan = null;
   let suppressClick = false;
+  let editing = null;
 
   const doc = () => frame.contentDocument;
   const win = () => frame.contentWindow;
@@ -56,6 +60,55 @@ export function createFrameTools(frame, { onPick, onKey, onZoom }) {
     onPick({ selector, html: element.outerHTML }, true);
   }
 
+  function editableText(element) {
+    const [node, ...rest] = element.childNodes;
+    return node?.nodeType === Node.TEXT_NODE && !rest.length && node.data.trim() ? node : null;
+  }
+
+  function occurrenceOf(node) {
+    const key = node.data.trim();
+    const walker = doc().createTreeWalker(doc().documentElement, NodeFilter.SHOW_TEXT);
+    let count = 0;
+    for (let other = walker.nextNode(); other && other !== node; other = walker.nextNode()) {
+      if (other.data.trim() === key && !other.parentElement?.closest(HIDDEN_TEXT.join(','))) count++;
+    }
+    return count;
+  }
+
+  function onEditKey(event) {
+    if (event.key === 'Enter' && !event.isComposing) {
+      event.preventDefault();
+      finishEdit(true);
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      finishEdit(false);
+    }
+  }
+
+  function startEdit(element) {
+    const node = editableText(element);
+    if (!node || !canEdit()) return;
+    editing = { element, text: node.data, occurrence: occurrenceOf(node) };
+    element.setAttribute('contenteditable', 'plaintext-only');
+    element.dataset.hunsuEditing = '';
+    element.addEventListener('keydown', onEditKey);
+    element.addEventListener('blur', () => finishEdit(true), { once: true });
+    element.focus();
+    win().getSelection().selectAllChildren(element);
+  }
+
+  function finishEdit(commit) {
+    if (!editing) return;
+    const { element, text, occurrence } = editing;
+    editing = null;
+    element.removeEventListener('keydown', onEditKey);
+    element.removeAttribute('contenteditable');
+    delete element.dataset.hunsuEditing;
+    const value = element.textContent;
+    if (!commit) element.textContent = text;
+    else if (value.trim() !== text.trim()) onEditText({ text, occurrence, value });
+  }
+
   function endPan() {
     suppressClick = pan.moved;
     pan = null;
@@ -78,6 +131,8 @@ export function createFrameTools(frame, { onPick, onKey, onZoom }) {
 
   function onDown(event) {
     if (event.button !== 0) return;
+    if (editing?.element.contains(event.target)) return;
+    finishEdit(true);
     if (tool === 'select') {
       event.preventDefault();
       return;
@@ -87,6 +142,7 @@ export function createFrameTools(frame, { onPick, onKey, onZoom }) {
   }
 
   function onClick(event) {
+    if (editing?.element.contains(event.target)) return;
     if (tool === 'select') {
       event.preventDefault();
       event.stopPropagation();
@@ -105,6 +161,7 @@ export function createFrameTools(frame, { onPick, onKey, onZoom }) {
 
   function attach() {
     const d = doc();
+    editing = null;
     if (!d?.documentElement) return;
     const style = d.createElement('style');
     style.id = 'hunsu-style';
@@ -128,6 +185,9 @@ export function createFrameTools(frame, { onPick, onKey, onZoom }) {
     d.addEventListener('mousedown', onDown, true);
     d.addEventListener('mouseup', () => pan && endPan(), true);
     d.addEventListener('click', onClick, true);
+    d.addEventListener('dblclick', (event) => {
+      if (tool === 'select' && !editing) startEdit(event.target);
+    }, true);
     d.addEventListener('keydown', onKey, true);
     d.addEventListener('wheel', (event) => {
       if (!event.ctrlKey) return;
@@ -142,6 +202,7 @@ export function createFrameTools(frame, { onPick, onKey, onZoom }) {
 
   return {
     setTool(next) {
+      finishEdit(true);
       tool = next;
       pan = null;
       applyTool();
