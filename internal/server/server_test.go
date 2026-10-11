@@ -45,7 +45,7 @@ func newServer(t *testing.T) (http.Handler, string, *ui.Hub) {
 func newServerWith(t *testing.T, renderer server.Renderer) (http.Handler, string, *ui.Hub) {
 	t.Helper()
 	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "notes.txt": "notes.txt"})
-	svc, err := chat.New(p, startProvider{})
+	svc, err := chat.New(p, startProvider{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -78,6 +78,11 @@ func TestServer_API(t *testing.T) {
 		{"디자인 폴더를 ZIP 으로 내보낸다", "GET", "/api/export/zip", "", 200, "page.html", "Content-Type: application/zip"},
 		{"페이지를 파일 하나짜리 HTML 로 내보낸다", "GET", "/api/export/html?page=page.html", "", 200, "page.html", "Content-Disposition: attachment; filename=page.html"},
 		{"페이지가 아닌 파일은 HTML 로 내보내지 않는다", "GET", "/api/export/html?page=notes.txt", "", 404, "", ""},
+		{"버전 목록을 최신부터 준다", "GET", "/api/versions", "", 200, "[]", ""},
+		{"지금 상태를 버전으로 남긴다", "POST", "/api/versions?page=page.html", "", 200, `{"saved":true}`, ""},
+		{"없는 버전으로는 복원하지 않는다", "POST", "/api/versions/restore?id=9", "", 404, "", ""},
+		{"버전 번호가 숫자가 아니면 거부한다", "POST", "/api/versions/restore?id=x", "", 400, "", ""},
+		{"썸네일이 없으면 없다고 알린다", "GET", "/api/versions/thumb?id=1", "", 404, "", ""},
 		{"렌더용 프로젝트 파일은 캐시 없이 준다", "GET", "/p/page.html", "", 200, "page.html", "Cache-Control: no-store"},
 		{"채팅 요청의 진행 이벤트를 스트림으로 보낸다", "POST", "/api/chat", `{"prompt":"고쳐"}`, 200, `data: {"kind":"start"}`, "Content-Type: text/event-stream"},
 		{"빈 채팅 요청은 거부한다", "POST", "/api/chat", `{"prompt":""}`, 400, "", ""},

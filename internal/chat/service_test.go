@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"hunsu/internal/chat"
+	"hunsu/internal/history"
 	"hunsu/internal/llm"
 	"hunsu/internal/project"
 	"hunsu/internal/project/projecttest"
@@ -58,7 +59,7 @@ func newFixture(t *testing.T) *fixture {
 }
 
 func (f *fixture) restart() {
-	svc, err := chat.New(f.project, f.runner)
+	svc, err := chat.New(f.project, f.runner, nil)
 	f.must(err)
 	f.svc = svc
 }
@@ -73,6 +74,22 @@ func (f *fixture) send(turn chat.Turn) string {
 }
 
 func (f *fixture) lastRequest() llm.Request { return f.runner.requests[len(f.runner.requests)-1] }
+
+func (f *fixture) versions() string {
+	versions, err := f.svc.Versions()
+	f.must(err)
+	var out []string
+	for _, v := range versions {
+		out = append(out, fmt.Sprintf("%d:%s:%s", v.ID, v.Label, v.Page))
+	}
+	return strings.Join(out, " ")
+}
+
+func (f *fixture) read(name string) string {
+	data, err := f.project.Read(name)
+	f.must(err)
+	return string(data)
+}
 
 func (f *fixture) warmUp() { f.send(chat.Turn{Prompt: "준비"}) }
 
@@ -269,18 +286,91 @@ func TestService(t *testing.T) {
 				return strings.Join(listing.Assets, ",")
 			},
 			"assets/logo.png"},
-		{"요청을 처리하는 동안 다른 요청, 되돌리기, 체크포인트는 받지 않는다",
+		{"요청이 끝나면 요청 내용을 이름으로, 그 전 상태는 '요청 전' 으로 버전을 남긴다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
+				f.send(chat.Turn{Page: "a.html", Prompt: "버튼 둥글게"})
+				return f.versions()
+			},
+			"2:버튼 둥글게:a.html 1:요청 전:a.html"},
+		{"요청 전에 사용자가 고친 내용은 '요청 전' 버전으로 따로 남는다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
+				f.send(chat.Turn{Page: "a.html", Prompt: "1"})
+				f.must(f.project.Write("a.html", []byte("직접 고침")))
+				f.send(chat.Turn{Page: "a.html", Prompt: "2"})
+				return f.versions()
+			},
+			"4:2:a.html 3:요청 전:a.html 2:1:a.html 1:요청 전:a.html"},
+		{"실패한 요청은 버전을 남기지 않는다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "반쯤 고침"}
+				f.runner.err = errors.New("boom")
+				f.send(chat.Turn{Page: "a.html", Prompt: "고쳐"})
+				return f.versions()
+			},
+			"1:요청 전:a.html"},
+		{"새로 만든 페이지가 있으면 그 페이지를 버전의 대표 페이지로 쓴다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"b.html": "b"}
+				f.send(chat.Turn{Page: "a.html", Prompt: "b 만들어"})
+				return f.versions()
+			},
+			"2:b 만들어:b.html 1:요청 전:a.html"},
+		{"보던 페이지가 없으면 첫 페이지를 대표 페이지로 쓴다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
+				f.send(chat.Turn{Prompt: "고쳐"})
+				return f.versions()
+			},
+			"2:고쳐:a.html 1:요청 전:a.html"},
+		{"버전으로 복원하면 그 파일로 돌아가고, 복원 전 상태와 복원 결과도 버전으로 남는다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
+				f.send(chat.Turn{Page: "a.html", Prompt: "고쳐"})
+				f.must(f.project.Write("a.html", []byte("직접 고침")))
+				f.must(f.svc.Restore(1, "a.html"))
+				return f.read("a.html") + " / " + f.versions()
+			},
+			"a / 4:v1 복원:a.html 3:복원 전:a.html 2:고쳐:a.html 1:요청 전:a.html"},
+		{"없는 버전으로는 복원하지 않고 아무것도 남기지 않는다",
+			func(f *fixture) string {
+				err := f.svc.Restore(9, "a.html")
+				return fmt.Sprint(errors.Is(err, history.ErrNoVersion), " ", errors.Is(f.svc.Undo(), history.ErrNothingToUndo), " [", f.versions(), "]")
+			},
+			"true true []"},
+		{"복원은 되돌리기로 취소할 수 있다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
+				f.send(chat.Turn{Page: "a.html", Prompt: "고쳐"})
+				f.must(f.svc.Restore(1, "a.html"))
+				f.must(f.svc.Undo())
+				return f.read("a.html")
+			},
+			"LLM 이 고침"},
+		{"버전 저장은 지금 상태를 남기고, 바뀐 것이 없으면 남기지 않는다",
+			func(f *fixture) string {
+				first, err := f.svc.SaveVersion("a.html")
+				f.must(err)
+				second, err := f.svc.SaveVersion("a.html")
+				f.must(err)
+				return fmt.Sprint(first, " ", second, " ", f.versions())
+			},
+			"true false 1:직접 저장:a.html"},
+		{"요청을 처리하는 동안 다른 요청, 되돌리기, 체크포인트, 버전 저장, 복원은 받지 않는다",
 			func(f *fixture) string {
 				f.runner.started, f.runner.release = make(chan struct{}), make(chan struct{})
 				done := make(chan string)
 				go func() { done <- f.send(chat.Turn{Prompt: "1"}) }()
 				<-f.runner.started
-				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(llm.Event) {}), " / ", f.svc.Undo(), " / ", f.svc.Checkpoint())
+				_, saveErr := f.svc.SaveVersion("a.html")
+				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(llm.Event) {}), " / ", f.svc.Undo(), " / ", f.svc.Checkpoint(),
+					" / ", saveErr, " / ", f.svc.Restore(1, "a.html"))
 				close(f.runner.release)
 				<-done
 				return got
 			},
-			chat.ErrBusy.Error() + " / " + chat.ErrBusy.Error() + " / " + chat.ErrBusy.Error()},
+			strings.Repeat(chat.ErrBusy.Error()+" / ", 4) + chat.ErrBusy.Error()},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

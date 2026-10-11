@@ -96,12 +96,23 @@
       <div class="actions">
         <select name="model" aria-label="모델"></select>
         <button type="button" id="undo">되돌리기</button>
+        <button type="button" id="versions-open">버전</button>
         <button type="button" id="new-chat">새 대화</button>
         <button id="send" class="primary">보내기</button>
       </div>
     </form>
   </section>
 </section>
+<dialog id="versions" aria-labelledby="versions-title">
+  <header>
+    <h2 id="versions-title">버전</h2>
+    <button type="button" id="version-save">지금 상태 저장</button>
+    <button type="button" class="icon" id="versions-close" aria-label="닫기">×</button>
+  </header>
+  <p class="hint">요청이 끝날 때마다 자동으로 남는다. 복원해도 [되돌리기] 로 돌아갈 수 있다.</p>
+  <p class="hint" id="version-note" role="status"></p>
+  <ol id="version-list"></ol>
+</dialog>
 <p id="status" role="status"></p>
 <script src="vendor/codemirror/codemirror.min.js"></script>
 <script src="vendor/codemirror/mode/xml/xml.min.js"></script>

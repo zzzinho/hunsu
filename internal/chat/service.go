@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"maps"
 	"slices"
 	"strings"
@@ -21,6 +22,13 @@ const (
 	Ended   = "end"
 )
 
+const (
+	beforeRequest = "요청 전"
+	beforeRestore = "복원 전"
+	savedByUser   = "직접 저장"
+	labelLimit    = 60
+)
+
 var (
 	ErrBusy        = errors.New("이미 요청을 처리하는 중")
 	ErrEmptyPrompt = errors.New("요청이 비어 있다")
@@ -34,16 +42,22 @@ type Turn struct {
 }
 
 type Service struct {
-	mu      sync.Mutex
-	project *project.Project
-	llm     llm.Provider
-	history *history.History
-	session session
-	seen    map[string][32]byte
+	mu       sync.Mutex
+	project  *project.Project
+	llm      llm.Provider
+	history  *history.History
+	timeline *history.Timeline
+	session  session
+	seen     map[string][32]byte
 }
 
-func New(p *project.Project, provider llm.Provider) (*Service, error) {
+// thumb 가 nil 이면 버전에 썸네일을 남기지 않는다.
+func New(p *project.Project, provider llm.Provider, thumb history.Thumbnailer) (*Service, error) {
 	h, err := history.New(p)
+	if err != nil {
+		return nil, err
+	}
+	timeline, err := history.NewTimeline(p, thumb)
 	if err != nil {
 		return nil, err
 	}
@@ -51,7 +65,7 @@ func New(p *project.Project, provider llm.Provider) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{project: p, llm: provider, history: h, session: session{state}}, nil
+	return &Service{project: p, llm: provider, history: h, timeline: timeline, session: session{state}}, nil
 }
 
 func (s *Service) Models() []llm.Model { return s.llm.Models() }
@@ -73,6 +87,9 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	if err := s.history.Save(); err != nil {
 		return err
 	}
+	if _, err := s.timeline.Keep(beforeRequest, representative(nil, t.Page, before.Pages)); err != nil {
+		return err
+	}
 	edited := s.editedSinceLastReply(current)
 	req := llm.Request{
 		Dir:          s.project.Dir(),
@@ -89,8 +106,10 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 
 	after, listErr := s.project.List()
 	s.seen = fingerprints(s.contents(after))
+	var created []string
 	for _, page := range after.Pages {
 		if !slices.Contains(before.Pages, page) {
+			created = append(created, page)
 			emit(llm.Event{Kind: Created, File: page})
 		}
 	}
@@ -101,8 +120,60 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	if err := cmp.Or(runErr, listErr, saveErr); err != nil {
 		return err
 	}
+	if _, err := s.timeline.Keep(truncate(t.Prompt, labelLimit), representative(created, t.Page, after.Pages)); err != nil {
+		return err
+	}
 	emit(llm.Event{Kind: Ended})
 	return nil
+}
+
+// 버전의 썸네일로 찍을 페이지: 새로 만든 페이지 → 보고 있던 페이지 → 첫 페이지.
+func representative(created []string, viewing string, pages []string) string {
+	switch {
+	case len(created) > 0:
+		return created[0]
+	case slices.Contains(pages, viewing):
+		return viewing
+	case len(pages) > 0:
+		return pages[0]
+	}
+	return ""
+}
+
+func (s *Service) Versions() ([]history.Version, error) { return s.timeline.List() }
+
+func (s *Service) Thumbnail(id int) ([]byte, error) { return s.timeline.Thumbnail(id) }
+
+// SaveVersion 은 지금 상태를 버전으로 남긴다. 직전 버전과 같으면 남기지 않고 false 다.
+func (s *Service) SaveVersion(page string) (bool, error) {
+	if !s.mu.TryLock() {
+		return false, ErrBusy
+	}
+	defer s.mu.Unlock()
+	return s.timeline.Keep(savedByUser, page)
+}
+
+// Restore 는 버전 id 의 파일로 돌아간다. 복원 전 상태는 되돌리기와 버전에 남고, 복원 결과도 새 버전이 된다.
+func (s *Service) Restore(id int, page string) error {
+	if !s.mu.TryLock() {
+		return ErrBusy
+	}
+	defer s.mu.Unlock()
+	v, err := s.timeline.Version(id)
+	if err != nil {
+		return err
+	}
+	if err := s.history.Save(); err != nil {
+		return err
+	}
+	if _, err := s.timeline.Keep(beforeRestore, page); err != nil {
+		return err
+	}
+	if _, err := s.timeline.Restore(id); err != nil {
+		return err
+	}
+	_, err = s.timeline.Keep(fmt.Sprintf("v%d 복원", id), v.Page)
+	return err
 }
 
 func (s *Service) defaultModel() string {

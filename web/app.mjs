@@ -6,6 +6,7 @@ import { createFrameTools } from './frame.mjs';
 import { toolForKey } from './tools.mjs';
 import { replaceText } from './textedit.mjs';
 import { exportURL, filenameOf } from './download.mjs';
+import { timeText } from './versions.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
@@ -218,6 +219,48 @@ async function download(kind) {
   link.download = filenameOf(res.headers.get('Content-Disposition') ?? '');
   link.click();
   setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+function versionItem(version) {
+  const item = document.createElement('li');
+  const thumb = document.createElement(version.thumb ? 'img' : 'div');
+  thumb.className = 'thumb';
+  if (version.thumb) {
+    thumb.src = `/api/versions/thumb?id=${version.id}`;
+    thumb.alt = '';
+    thumb.loading = 'lazy';
+  } else {
+    thumb.textContent = version.page || '썸네일 없음';
+  }
+  const title = document.createElement('strong');
+  title.textContent = `v${version.id} · ${version.label}`;
+  const meta = document.createElement('span');
+  meta.className = 'meta';
+  meta.textContent = [timeText(new Date(version.time), new Date()), version.page].filter(Boolean).join(' · ');
+  const restore = document.createElement('button');
+  restore.type = 'button';
+  restore.textContent = '복원';
+  restore.disabled = Boolean(running);
+  restore.onclick = () => noteErrors(restoreVersion(version.id));
+  item.append(thumb, title, meta, restore);
+  return item;
+}
+
+const noteErrors = (promise) => promise.catch((error) => { $('#version-note').textContent = error.message; });
+
+async function showVersions() {
+  $('#version-note').textContent = '';
+  const versions = await (await request('/api/versions')).json();
+  $('#version-list').replaceChildren(...versions.map(versionItem));
+  $('#version-save').disabled = Boolean(running);
+}
+
+async function restoreVersion(id) {
+  if (!editor.isClean()) await save();
+  await request(`/api/versions/restore?id=${id}&page=${encodeURIComponent(state.preview ?? '')}`, { method: 'POST' });
+  addMessage('progress', `v${id} 으로 복원했습니다`);
+  await Promise.all([showVersions(), openExisting()]);
+  $('#version-note').textContent = `v${id} 으로 복원했습니다`;
 }
 
 async function reloadEditor(path) {
@@ -466,6 +509,18 @@ $$('[data-export]').forEach((button) => {
 document.addEventListener('click', (event) => {
   if (!event.target.closest('#export')) $('#export').open = false;
 });
+$('#versions-open').onclick = async () => {
+  await showVersions();
+  $('#versions').showModal();
+};
+$('#versions-close').onclick = () => $('#versions').close();
+$('#version-save').onclick = () => noteErrors((async () => {
+  if (!editor.isClean()) await save();
+  const res = await request(`/api/versions?page=${encodeURIComponent(state.preview ?? '')}`, { method: 'POST' });
+  const { saved } = await res.json();
+  await showVersions();
+  $('#version-note').textContent = saved ? '지금 상태를 저장했습니다' : '직전 버전과 같아서 남기지 않았습니다';
+})());
 $('.upload input').onchange = async ({ target }) => {
   await upload(target.files);
   target.value = '';
