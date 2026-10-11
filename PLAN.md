@@ -42,12 +42,12 @@ HTML 로 디자인하는 로컬 디자인 도구. 원본을 직접 고치거나 
 | 모델 | provider 가 목록과 기본값(첫 번째)을 정한다. 화면은 `/api/models` | claude provider: opus(기본)·sonnet·haiku. haiku 는 2배 빠르고 20배 싸다 (11) |
 | 캔버스 | 파일 1개 미리보기 + 모바일/데스크톱 너비 | 다중 프레임은 MVP 핵심과 무관 |
 | 외부 에이전트 | MCP 서버 `/mcp` | 클라이언트(Claude Code, Codex 등)에 묶이지 않는 표준 (7) |
-| 배포 | GitHub Release + Homebrew tap. 서명 없음 | brew 설치는 Gatekeeper 에 막히지 않는다. Apple 개발자 등록 불필요 |
-| provider 연결 | 각 CLI 의 로그인을 쓴다. hunsu 는 키를 갖지 않는다 | `claude auth status --json`, `codex login status` 로 확인하고 로그인 명령을 안내 |
-| UI 언어 | 영어 기본, 설정에서 한국어 | v1 은 다른 사람이 쓴다 |
-| 버저닝 | 내장 타임라인 (git 미사용) | 의존성 없음. 디자이너도 쓸 수 있다 |
-| 렌더 확인 | `screenshot` MCP 도구, 시점은 LLM 이 판단 | 품질을 올리되 작은 수정의 시간·비용은 늘리지 않는다 |
-| 직접 조작 | 텍스트만 렌더 화면에서 수정. 속성 패널은 하지 않는다 | 문구 수정에 LLM(7초~1분 이상)을 쓰지 않게 |
+| 배포 (v1) | GitHub Release + Homebrew tap. 서명 없음 | brew 설치는 Gatekeeper 에 막히지 않는다. Apple 개발자 등록 불필요 |
+| provider 연결 (v1) | 각 CLI 의 로그인을 쓴다. hunsu 는 키를 갖지 않는다 | `claude auth status --json`, `codex login status` 로 확인하고 로그인 명령을 안내 |
+| UI 언어 (v1) | 영어 기본, 설정에서 한국어 | v1 은 다른 사람이 쓴다 |
+| 버저닝 (v1) | 내장 타임라인 (git 미사용) | 의존성 없음. 디자이너도 쓸 수 있다 |
+| 렌더 확인 (v1) | `screenshot` MCP 도구, 시점은 LLM 이 판단 | 품질을 올리되 작은 수정의 시간·비용은 늘리지 않는다 |
+| 직접 조작 (v1) | 텍스트만 렌더 화면에서 수정. 속성 패널은 하지 않는다 | 문구 수정에 LLM(7초~1분 이상)을 쓰지 않게 |
 
 ## 4. 아키텍처
 
@@ -150,7 +150,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | 도구 | `get_context`, `checkpoint`, `undo`, `open_page` | 브라우저 상태와 되돌리기 연결만 hunsu 의 일 |
 | 전송 | 기존 HTTP 서버의 `/mcp` (Streamable HTTP, 응답 하나) | 브라우저 상태를 같은 프로세스에서 공유. stdio 는 별도 프로세스 |
 | 구현 | 표준 라이브러리 JSON-RPC (`initialize`, `ping`, `tools/list`, `tools/call`) | 도구 호출만 필요 |
-| 포트·인증 | 7777 고정, `Bearer` 토큰(사용자 설정 폴더, 0600, 재사용) | 등록한 주소·헤더가 바뀌지 않게 |
+| 포트·인증 | 7777 고정, `Bearer` 토큰(사용자 설정 폴더, 0600, 재사용) | 등록한 주소·헤더가 바뀌지 않게. `-port` 로 바꾸면 다시 등록해야 한다 |
 | 화면 상태 | 브라우저가 `POST /api/ui` 로 알린다. 같은 출처만 | 가짜 선택 요소로 에이전트에 지시를 끼워 넣는 것 차단 |
 | 브라우저 명령 | `GET /api/ui/commands` (SSE) | `open_page` |
 | 안내문 | 디자인 규칙은 브라우저 채팅과 공유. 클라이언트 도구 이름을 쓰지 않는다 | 클라이언트 중립 |
@@ -186,13 +186,13 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 **v1**
 
-- [ ] 4. 보안·설치: 나머지 API 에 Host·Origin 검사. provider 계약에 `Status()`(설치·로그인 확인, 안내 명령). universal 바이너리를 GitHub Release 와 Homebrew tap 으로 배포
-- [ ] 5. 영어 UI: 번역 모듈(영어 기본, 설정에서 한국어, 선택 기억). LLM 은 사용자가 쓴 언어로 답한다. 프롬프트 라벨·터미널 출력 영어
-- [ ] 6. 에셋: `assets/` 폴더(유일한 하위 폴더). 끌어다 놓아 업로드(이미지·폰트, 크기 제한). 목록을 프롬프트와 `get_context` 에
+- [ ] 4. 보안·설치: 나머지 API 에 Host·Origin 검사. provider 계약에 `Status()`(설치·로그인 확인, 안내 명령). universal 바이너리를 GitHub Release 와 Homebrew tap 으로 배포. `/p/*` 가 `.hunsu/`·디렉터리 목록까지 서빙하는 범위 정리. MCP `initialize` 가 요청 버전을 그대로 돌려주는 협상 검토
+- [ ] 5. 영어 UI: 번역 모듈(영어 기본, 설정에서 한국어, 선택 기억). LLM 은 사용자가 쓴 언어로 답한다(`instructions.md` 의 "한국어 한두 문장" 수정). 프롬프트 라벨·터미널 출력 영어. provider 의 모델 라벨("haiku (빠름)")을 번역할 위치 결정
+- [ ] 6. 에셋: `assets/` 폴더(유일한 하위 폴더). 끌어다 놓아 업로드(이미지·폰트, 크기 제한). 목록을 프롬프트와 `get_context` 에. `rules.md` 의 "하위 폴더 금지, 이미지는 CSS·SVG" 수정. 되돌리기 스냅샷에 에셋 포함 여부 결정
 - [ ] 7. 텍스트 직접 수정: 렌더 화면에서 더블클릭해 문구를 고치면 원본에 반영
 - [ ] 8. 렌더러: headless Chrome 스크린샷. `screenshot` MCP 도구를 내장 provider 와 외부 에이전트가 함께 쓴다. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 기능을 끈다
 - [ ] 9. 내보내기: 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용)
-- [ ] 10. 버저닝: 요청마다 자동 + [버전 저장]. 시각·요청·썸네일 타임라인, 아무 버전으로 복원(복원도 새 버전). 되돌리기는 이전 버전으로
+- [ ] 10. 버저닝: 요청마다 자동 + [버전 저장]. 시각·요청·썸네일 타임라인, 아무 버전으로 복원(복원도 새 버전). 되돌리기는 이전 버전으로. MCP `undo` 는 지금 브라우저 요청 스냅샷도 함께 되돌리므로 설명을 맞춘다
 - [ ] 11. Codex provider: `codex exec --json`. provider 선택, provider 별 대화 ID
 - [ ] 12. 비교안(옵션): 한 요청에 2~3안, 나란히 보기, 고른 안이 페이지가 되고 나머지는 버전에 남는다
 
