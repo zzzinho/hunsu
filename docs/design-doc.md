@@ -231,7 +231,7 @@ type Provider interface {
 | 4. 보안·설치 | 나머지 API 에 Host·Origin 검사. `Provider.Status()`. universal 바이너리를 GitHub Release + Homebrew tap 으로 | server, llm 계약 |
 | 5. 영어 UI | 번역 모듈. LLM 은 사용자가 쓴 언어로 답한다. 프롬프트 라벨·터미널 출력은 영어 | web, chat 프롬프트 |
 | 6. 에셋 (구현됨) | `assets/` 에 끌어다 놓아 업로드(이미지·폰트, 10MB). 목록을 프롬프트와 `get_context` 에 | project, 디자인 규칙 |
-| 7. 텍스트 직접 수정 | 렌더에서 더블클릭해 고친 문구를 원본에 반영 | web, 파일 API |
+| 7. 텍스트 직접 수정 (구현됨) | 렌더에서 더블클릭해 고친 문구를 원본에 반영. 같은 문구 중 몇 번째인지로 원본 위치를 찾는다 | web |
 | 8. 렌더러 | headless Chrome 스크린샷. `screenshot` 도구 공용. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 끈다 (A17) | 새 패키지, mcptools, provider |
 | 9. 내보내기 | 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용) | 새 패키지 |
 | 10. 버저닝 | 3.3 되돌리기·버저닝의 타임라인 | history 대체 |

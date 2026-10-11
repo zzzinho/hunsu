@@ -7,7 +7,7 @@ A local, HTML-native design tool: edit pages by hand or have an LLM build and re
 ![hunsu demo: select a heading, ask to make it amber and larger, check at mobile width, then undo](docs/demo.gif)
 
 - **Build and edit by talking**: create pages and a design system from an empty folder, then refine with "make this button bigger".
-- **Select elements**: click in the render view to say "this".
+- **Select elements**: click in the render view to say "this"; double-click to edit text in place.
 - **Design system**: `DESIGN.md` (rules) and `design.css` (values), shared by every page and the LLM.
 - **Assets**: drop in images and fonts; the LLM uses them in pages.
 - **External agents (MCP)**: MCP clients such as Claude Code or Codex see your selection and edit files directly.
@@ -50,10 +50,14 @@ Click an element with the select tool (V); a selection chip appears above the in
 
 | Tool | Behavior |
 |---|---|
-| Select (V) | Click to select. Links and buttons don't fire |
+| Select (V) | Click to select, double-click to edit text. Links and buttons don't fire |
 | Hand (H) | Drag to move inside the page. A click without dragging works normally |
 | Mobile / Desktop | 390px / full render width |
 | − 100% + | Zoom 25–300% |
+
+**Edit text in place**
+
+Double-click an element that holds only text (headings, buttons, links) to edit it. Enter or clicking elsewhere saves to the source; Esc cancels. Text the source doesn't contain, such as text written by page JavaScript, is not saved and you are told why. Like editor saves, this is not part of Undo.
 
 **Design system**
 
