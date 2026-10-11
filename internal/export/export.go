@@ -16,10 +16,15 @@ import (
 
 var ErrNotPage = errors.New("not a page")
 
-var (
-	stylesheetLink = regexp.MustCompile(`(?i)<link\b[^>]*\bhref\s*=\s*["']?(?:\./)?design\.css["']?[^>]*>`)
-	assetRef       = regexp.MustCompile(`(?:\./)?assets/[^"'()\s<>&]+`)
-)
+var stylesheetLink = regexp.MustCompile(`(?i)<link\b[^>]*\bhref\s*=\s*["']?(?:\./)?design\.css["']?[^>]*>`)
+
+// 에셋 경로는 따옴표로 감싼 값 전체나 따옴표 없는 url() 인자 전체일 때만 바꾼다.
+// 다른 주소 안의 assets/ 나 본문 글자는 건드리지 않고, 이름의 공백·괄호도 받는다.
+var assetRefs = []*regexp.Regexp{
+	regexp.MustCompile(`"((?:\./)?assets/[^"]+)"`),
+	regexp.MustCompile(`'((?:\./)?assets/[^']+)'`),
+	regexp.MustCompile(`\(\s*((?:\./)?assets/[^"'()\s]+)\s*\)`),
+}
 
 // HTML 은 페이지 하나를 파일 하나로 만든다. design.css 와 에셋을 그 안에 넣는다.
 func HTML(p *project.Project, page string) ([]byte, error) {
@@ -48,17 +53,29 @@ func HTML(p *project.Project, page string) ([]byte, error) {
 }
 
 func inlineAssets(p *project.Project, assets []string, src []byte) []byte {
-	return assetRef.ReplaceAllFunc(src, func(ref []byte) []byte {
-		name, err := url.PathUnescape(strings.TrimPrefix(string(ref), "./"))
-		if err != nil || !slices.Contains(assets, name) {
-			return ref
-		}
-		data, err := fs.ReadFile(p.FS(), name)
-		if err != nil {
-			return ref
-		}
-		return []byte("data:" + project.AssetType(name) + ";base64," + base64.StdEncoding.EncodeToString(data))
-	})
+	for _, re := range assetRefs {
+		src = re.ReplaceAllFunc(src, func(match []byte) []byte {
+			at := re.FindSubmatchIndex(match)
+			uri, ok := dataURI(p, assets, string(match[at[2]:at[3]]))
+			if !ok {
+				return match
+			}
+			return slices.Concat(match[:at[2]], []byte(uri), match[at[3]:])
+		})
+	}
+	return src
+}
+
+func dataURI(p *project.Project, assets []string, ref string) (string, bool) {
+	name, err := url.PathUnescape(strings.TrimPrefix(ref, "./"))
+	if err != nil || !slices.Contains(assets, name) {
+		return "", false
+	}
+	data, err := fs.ReadFile(p.FS(), name)
+	if err != nil {
+		return "", false
+	}
+	return "data:" + project.AssetType(name) + ";base64," + base64.StdEncoding.EncodeToString(data), true
 }
 
 // ZIP 은 디자인 시스템, 페이지, 에셋을 담는다. hunsu 의 상태(.hunsu/)는 넣지 않는다.

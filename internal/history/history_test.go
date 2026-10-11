@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"hunsu/internal/history"
@@ -46,6 +48,44 @@ func TestHistory_Undo(t *testing.T) {
 			}
 			if got := readFiles(t, p); !errors.Is(err, tt.wantErr) || !maps.Equal(got, tt.want) {
 				t.Errorf("Undo() 후 파일 = %v, error = %v; want %v, %v", got, err, tt.want, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestHistory_Snapshots(t *testing.T) {
+	tests := []struct {
+		name string
+		run  func(t *testing.T, p *project.Project, h *history.History) string
+		want string
+	}{
+		{"읽을 수 없는 페이지가 있으면 저장에 실패하고, 반쯤 저장한 시점은 남기지 않는다",
+			func(t *testing.T, p *project.Project, h *history.History) string {
+				setFiles(t, p, files{"a.html": "a", "b.html": "b", "c.html": "c"})
+				unreadable := filepath.Join(p.Dir(), "b.html")
+				must(t, os.Chmod(unreadable, 0))
+				saveErr := h.Save()
+				must(t, os.Chmod(unreadable, 0o644))
+				return fmt.Sprint(saveErr != nil, " ", errors.Is(h.Undo(), history.ErrNothingToUndo), " ", readFiles(t, p))
+			},
+			"true true map[a.html:a b.html:b c.html:c]"},
+		{"상태 폴더에 순번이 아닌 파일(.DS_Store 등)이 있어도 시점으로 보지 않는다",
+			func(t *testing.T, p *project.Project, h *history.History) string {
+				setFiles(t, p, files{"a.html": "1"})
+				must(t, h.Save())
+				must(t, os.WriteFile(p.StatePath("history", ".DS_Store"), []byte("finder"), 0o644))
+				first, second := h.Undo(), h.Undo()
+				return fmt.Sprint(first, " / ", second, " / ", readFiles(t, p))
+			},
+			"<nil> / nothing to undo / map[a.html:1]"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, _ := projecttest.New(t, nil)
+			h, err := history.New(p)
+			must(t, err)
+			if got := tt.run(t, p, h); got != tt.want {
+				t.Errorf("got %q, want %q", got, tt.want)
 			}
 		})
 	}

@@ -9,6 +9,7 @@ import (
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"hunsu/internal/history"
 	"hunsu/internal/llm"
@@ -52,10 +53,11 @@ type Service struct {
 	history  *history.History
 	timeline *history.Timeline
 	variants *history.Variants
-	pending  *variantRun
-	session  session
-	seen     map[string][32]byte
-	tools    *llm.MCPServer
+	// 비교안을 만드는 동안(잠금을 쥔 채)에도 화면이 목록을 읽으므로 잠금 밖에서 바꾼다.
+	pending atomic.Pointer[variantRun]
+	session session
+	seen    map[string][32]byte
+	tools   *llm.MCPServer
 }
 
 type Options struct {
@@ -132,7 +134,10 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	})
 
 	after, listErr := s.project.List()
-	s.seen = fingerprints(s.contents(after))
+	// 시작하지 못했으면 대화가 생기지 않았다. 다음 요청이 새 대화로 디자인 시스템 전체를 보내게 둔다.
+	if sessionID != "" {
+		s.seen = fingerprints(s.contents(after))
+	}
 	var created []string
 	for _, page := range after.Pages {
 		if !slices.Contains(before.Pages, page) {
@@ -252,7 +257,8 @@ func (s *Service) editedSinceLastReply(current map[string][]byte) []string {
 	}
 	var edited []string
 	now := fingerprints(current)
-	for _, name := range slices.Sorted(maps.Keys(now)) {
+	names := slices.Concat(slices.Collect(maps.Keys(now)), slices.Collect(maps.Keys(s.seen)))
+	for _, name := range slices.Compact(slices.Sorted(slices.Values(names))) {
 		if s.seen[name] != now[name] {
 			edited = append(edited, name)
 		}

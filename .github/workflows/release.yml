@@ -24,7 +24,7 @@ jobs:
           node-version: 22
       - name: Test
         run: |
-          go test ./...
+          go test -race ./...
           node --test web/
       - name: Build universal binary
         run: |
