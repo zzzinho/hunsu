@@ -1,14 +1,8 @@
 package claude
 
-type Request struct {
-	Dir          string
-	Prompt       string
-	SystemPrompt string
-	SessionID    string
-	Model        string
-}
+import "hunsu/internal/llm"
 
-func (r Request) Args() []string {
+func Args(r llm.Request) []string {
 	args := []string{
 		"-p",
 		// 격리하지 않으면 사용자 설정·hook·MCP 를 불러와 2배 느리고 10배 비싸다 (PLAN.md 14).

@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"hunsu/internal/chat"
-	"hunsu/internal/claude"
+	"hunsu/internal/llm"
 	"hunsu/internal/mcp"
 	"hunsu/internal/mcptools"
 	"hunsu/internal/project"
@@ -16,9 +16,11 @@ import (
 	"hunsu/internal/ui"
 )
 
-type idleRunner struct{}
+type idleProvider struct{}
 
-func (idleRunner) Run(context.Context, claude.Request, func(claude.Event)) error { return nil }
+func (idleProvider) Models() []llm.Model { return nil }
+
+func (idleProvider) Run(context.Context, llm.Request, func(llm.Event)) error { return nil }
 
 type fixture struct {
 	t       *testing.T
@@ -30,7 +32,7 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	p, dir := projecttest.New(t, map[string]string{"a.html": "a", "design.css": ":root{}"})
-	svc, err := chat.New(p, idleRunner{})
+	svc, err := chat.New(p, idleProvider{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +81,7 @@ func TestTools(t *testing.T) {
 		{"checkpoint 뒤에 undo 하면 그 시점으로 돌아간다",
 			func(f *fixture) string {
 				f.call("checkpoint", `{}`)
-				f.must(f.project.Write("a.html", []byte("Claude Code 가 고침")))
+				f.must(f.project.Write("a.html", []byte("에이전트가 고침")))
 				f.call("undo", `{}`)
 				data, err := f.project.Read("a.html")
 				f.must(err)

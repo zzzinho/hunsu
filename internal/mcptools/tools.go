@@ -85,7 +85,7 @@ func workspaceOf(p *project.Project, hub *ui.Hub) (string, error) {
 	state := hub.Current()
 	var out bytes.Buffer
 	encoder := json.NewEncoder(&out)
-	// 선택한 요소의 HTML 을 Claude 가 < 대신 그대로 읽을 수 있게 한다.
+	// 선택한 요소의 HTML 을 에이전트가 \u003c 같은 이스케이프 없이 그대로 읽게 한다.
 	encoder.SetEscapeHTML(false)
 	err = encoder.Encode(workspace{Folder: p.Dir(), Pages: listing.Pages, DesignSystem: design, CurrentPage: state.Page, Selection: state.Selection})
 	return string(bytes.TrimSpace(out.Bytes())), err

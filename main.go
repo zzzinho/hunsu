@@ -15,6 +15,7 @@ import (
 
 	"hunsu/internal/chat"
 	"hunsu/internal/claude"
+	"hunsu/internal/llm"
 	"hunsu/internal/mcp"
 	"hunsu/internal/mcptools"
 	"hunsu/internal/project"
@@ -29,7 +30,7 @@ var webFiles embed.FS
 
 func main() {
 	noOpen := flag.Bool("no-open", false, "브라우저를 자동으로 열지 않는다")
-	// Claude Code 에 등록한 MCP 주소가 실행할 때마다 바뀌지 않도록 포트를 고정한다.
+	// MCP 클라이언트에 등록한 주소가 실행할 때마다 바뀌지 않도록 포트를 고정한다.
 	port := flag.Int("port", 7777, "서버 포트")
 	flag.Parse()
 	if err := run(cmp.Or(flag.Arg(0), "."), *port, !*noOpen); err != nil {
@@ -48,7 +49,7 @@ func run(dir string, port int, openBrowser bool) error {
 	if err != nil {
 		return err
 	}
-	assistant, err := chat.New(p, claude.CLI{Path: "claude"})
+	assistant, err := chat.New(p, provider())
 	if err != nil {
 		return err
 	}
@@ -68,11 +69,17 @@ func run(dir string, port int, openBrowser bool) error {
 
 	url := "http://" + ln.Addr().String() + "/"
 	fmt.Printf("hunsu: %s 를 %s 에서 엽니다\n", p.Dir(), url)
-	fmt.Printf("Claude Code 연결 (처음 한 번): claude mcp add --transport http -s user hunsu %smcp -H \"Authorization: Bearer %s\"\n", url, token)
+	fmt.Printf("MCP 서버: %smcp (헤더 Authorization: Bearer %s). 클라이언트별 등록 방법은 README 참고\n", url, token)
 	if openBrowser {
 		exec.Command("open", url).Start()
 	}
 	return http.Serve(ln, mux)
+}
+
+// 브라우저 채팅을 처리할 LLM 을 고르는 유일한 곳이다. PoC 는 Claude Code CLI 를 쓰고,
+// 다른 LLM 은 llm.Provider 를 구현한 뒤 여기서 바꾼다.
+func provider() llm.Provider {
+	return claude.CLI{Path: "claude"}
 }
 
 func mcpToken() (string, error) {

@@ -5,39 +5,16 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"regexp"
+
+	"hunsu/internal/llm"
 )
 
-const (
-	Started   = "start"
-	Thinking  = "think"
-	Reading   = "read"
-	Writing   = "write"
-	Answering = "answer"
-	Retrying  = "retry"
-	Replied   = "reply"
-	Failed    = "fail"
-)
-
+// 파일을 쓰는 동안 이만큼 늘 때마다 쓴 양을 알린다.
 const sizeStep = 1024
 
-type Event struct {
-	Kind      string `json:"kind"`
-	File      string `json:"file,omitempty"`
-	Size      int    `json:"size,omitempty"`
-	Text      string `json:"text,omitempty"`
-	SessionID string `json:"-"`
-}
-
-func (e Event) String() string {
-	if detail := cmp.Or(e.File, e.Text); detail != "" {
-		return e.Kind + ":" + detail
-	}
-	return e.Kind
-}
-
 var (
-	toolKinds       = map[string]string{"Read": Reading, "Edit": Writing, "Write": Writing}
-	blockKinds      = map[string]string{"thinking": Thinking, "text": Answering}
+	toolKinds       = map[string]string{"Read": llm.Reading, "Edit": llm.Writing, "Write": llm.Writing}
+	blockKinds      = map[string]string{"thinking": llm.Thinking, "text": llm.Answering}
 	filePathPattern = regexp.MustCompile(`"file_path"\s*:\s*"([^"]+)"`)
 )
 
@@ -75,7 +52,7 @@ type toolInput struct {
 	reported int
 }
 
-func (d *Decoder) Decode(raw []byte) []Event {
+func (d *Decoder) Decode(raw []byte) []llm.Event {
 	var line streamLine
 	if json.Unmarshal(raw, &line) != nil {
 		return nil
@@ -83,7 +60,7 @@ func (d *Decoder) Decode(raw []byte) []Event {
 	switch line.Type {
 	case "system":
 		if line.Subtype == "init" {
-			return []Event{{Kind: Started, SessionID: line.SessionID}}
+			return []llm.Event{{Kind: llm.Started, SessionID: line.SessionID}}
 		}
 	case "stream_event":
 		return d.streamEvent(line)
@@ -91,23 +68,23 @@ func (d *Decoder) Decode(raw []byte) []Event {
 		return toolResults(line)
 	case "result":
 		if line.IsError {
-			return []Event{{Kind: Failed, Text: cmp.Or(line.Result, line.Subtype)}}
+			return []llm.Event{{Kind: llm.Failed, Text: cmp.Or(line.Result, line.Subtype)}}
 		}
-		return []Event{{Kind: Replied, Text: line.Result}}
+		return []llm.Event{{Kind: llm.Replied, Text: line.Result}}
 	}
 	return nil
 }
 
-func (d *Decoder) streamEvent(line streamLine) []Event {
+func (d *Decoder) streamEvent(line streamLine) []llm.Event {
 	e := line.Event
 	switch e.Type {
 	case "content_block_start":
 		if kind, ok := toolKinds[e.ContentBlock.Name]; ok && e.ContentBlock.Type == "tool_use" {
 			d.tool = &toolInput{kind: kind}
-			return []Event{{Kind: kind}}
+			return []llm.Event{{Kind: kind}}
 		}
 		if kind, ok := blockKinds[e.ContentBlock.Type]; ok {
-			return []Event{{Kind: kind}}
+			return []llm.Event{{Kind: kind}}
 		}
 	case "content_block_delta":
 		if d.tool != nil && e.Delta.Type == "input_json_delta" {
@@ -119,7 +96,7 @@ func (d *Decoder) streamEvent(line streamLine) []Event {
 	return nil
 }
 
-func (t *toolInput) append(partial string) []Event {
+func (t *toolInput) append(partial string) []llm.Event {
 	t.json = append(t.json, partial...)
 	if t.file == "" {
 		match := filePathPattern.FindSubmatch(t.json)
@@ -128,30 +105,30 @@ func (t *toolInput) append(partial string) []Event {
 		}
 		t.file = filepath.Base(string(match[1]))
 		t.reported = len(t.json)
-		return []Event{{Kind: t.kind, File: t.file}}
+		return []llm.Event{{Kind: t.kind, File: t.file}}
 	}
-	if t.kind == Writing && len(t.json)-t.reported >= sizeStep {
+	if t.kind == llm.Writing && len(t.json)-t.reported >= sizeStep {
 		t.reported = len(t.json)
-		return []Event{{Kind: t.kind, File: t.file, Size: len(t.json)}}
+		return []llm.Event{{Kind: t.kind, File: t.file, Size: len(t.json)}}
 	}
 	return nil
 }
 
 // 사용자 메시지의 content 는 블록 배열이 아니라 문자열일 수도 있다. 그 경우 블록이 없는 것으로 본다.
-func toolResults(line streamLine) []Event {
+func toolResults(line streamLine) []llm.Event {
 	var blocks []struct {
 		Type    string `json:"type"`
 		IsError bool   `json:"is_error"`
 	}
 	json.Unmarshal(line.Message.Content, &blocks)
-	var events []Event
+	var events []llm.Event
 	for _, b := range blocks {
 		switch {
 		case b.Type != "tool_result":
 		case b.IsError:
-			events = append(events, Event{Kind: Retrying})
+			events = append(events, llm.Event{Kind: llm.Retrying})
 		default:
-			events = append(events, Event{Kind: Thinking})
+			events = append(events, llm.Event{Kind: llm.Thinking})
 		}
 	}
 	return events

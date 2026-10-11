@@ -103,7 +103,7 @@ func (p *Project) Write(name string, data []byte) error {
 	if err := p.editableFile(name); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
-	// 렌더 화면이나 claude 가 반쯤 쓰인 파일을 읽지 않도록 임시 파일에 쓴 뒤 이름을 바꾼다.
+	// 렌더 화면이나 LLM 이 반쯤 쓰인 파일을 읽지 않도록 임시 파일에 쓴 뒤 이름을 바꾼다.
 	tmp := "." + name + ".tmp"
 	if err := p.root.WriteFile(tmp, data, 0o644); err != nil {
 		return err

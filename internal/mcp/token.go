@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-// Claude Code 에 한 번 등록한 주소와 헤더가 계속 쓰이도록 토큰을 파일에 남겨 재사용한다.
+// MCP 클라이언트에 한 번 등록한 주소와 헤더가 계속 쓰이도록 토큰을 파일에 남겨 재사용한다.
 func LoadToken(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err == nil {

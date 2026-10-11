@@ -10,8 +10,8 @@ import (
 	"strings"
 	"sync"
 
-	"hunsu/internal/claude"
 	"hunsu/internal/history"
+	"hunsu/internal/llm"
 	"hunsu/internal/project"
 	"hunsu/internal/ui"
 )
@@ -21,17 +21,10 @@ const (
 	Ended   = "end"
 )
 
-// 사용자의 claude 기본 설정과 관계없이 디자인 품질이 가장 좋은 모델을 쓴다.
-const DefaultModel = "opus"
-
 var (
 	ErrBusy        = errors.New("이미 요청을 처리하는 중")
 	ErrEmptyPrompt = errors.New("요청이 비어 있다")
 )
-
-type Runner interface {
-	Run(ctx context.Context, req claude.Request, emit func(claude.Event)) error
-}
 
 type Turn struct {
 	Prompt    string        `json:"prompt"`
@@ -43,13 +36,13 @@ type Turn struct {
 type Service struct {
 	mu      sync.Mutex
 	project *project.Project
-	runner  Runner
+	llm     llm.Provider
 	history *history.History
 	session session
 	seen    map[string][32]byte
 }
 
-func New(p *project.Project, r Runner) (*Service, error) {
+func New(p *project.Project, provider llm.Provider) (*Service, error) {
 	h, err := history.New(p)
 	if err != nil {
 		return nil, err
@@ -58,10 +51,12 @@ func New(p *project.Project, r Runner) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{project: p, runner: r, history: h, session: session{state}}, nil
+	return &Service{project: p, llm: provider, history: h, session: session{state}}, nil
 }
 
-func (s *Service) Send(ctx context.Context, t Turn, emit func(claude.Event)) error {
+func (s *Service) Models() []llm.Model { return s.llm.Models() }
+
+func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error {
 	if strings.TrimSpace(t.Prompt) == "" {
 		return ErrEmptyPrompt
 	}
@@ -78,15 +73,15 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(claude.Event)) err
 	if err := s.history.Save(); err != nil {
 		return err
 	}
-	req := claude.Request{
+	req := llm.Request{
 		Dir:          s.project.Dir(),
 		Prompt:       userPrompt(t, s.editedSinceLastReply(current)),
 		SystemPrompt: systemPrompt(current),
 		SessionID:    s.session.load(),
-		Model:        cmp.Or(t.Model, DefaultModel),
+		Model:        cmp.Or(t.Model, s.defaultModel()),
 	}
 	var sessionID string
-	runErr := s.runner.Run(ctx, req, func(e claude.Event) {
+	runErr := s.llm.Run(ctx, req, func(e llm.Event) {
 		sessionID = cmp.Or(e.SessionID, sessionID)
 		emit(e)
 	})
@@ -95,7 +90,7 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(claude.Event)) err
 	s.seen = fingerprints(s.contents(after))
 	for _, page := range after.Pages {
 		if !slices.Contains(before.Pages, page) {
-			emit(claude.Event{Kind: Created, File: page})
+			emit(llm.Event{Kind: Created, File: page})
 		}
 	}
 	var saveErr error
@@ -105,11 +100,18 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(claude.Event)) err
 	if err := cmp.Or(runErr, listErr, saveErr); err != nil {
 		return err
 	}
-	emit(claude.Event{Kind: Ended})
+	emit(llm.Event{Kind: Ended})
 	return nil
 }
 
-// 되돌린 내용은 claude 가 모르는 변경이므로 seen 을 갱신하지 않는다. 다음 요청에서 직접 고친 파일로 알려진다.
+func (s *Service) defaultModel() string {
+	if models := s.llm.Models(); len(models) > 0 {
+		return models[0].ID
+	}
+	return ""
+}
+
+// 되돌린 내용은 LLM 이 모르는 변경이므로 seen 을 갱신하지 않는다. 다음 요청에서 직접 고친 파일로 알려진다.
 func (s *Service) Undo() error {
 	if !s.mu.TryLock() {
 		return ErrBusy

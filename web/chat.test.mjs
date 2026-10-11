@@ -22,7 +22,7 @@ test('stepText', (t) => table(t, [
   ['쓴 양을 알면 KB 로 함께 보인다', { kind: 'write', file: 'a.html', size: 12698 }, 'a.html 쓰는 중 · 12.4KB'],
   ['답변을 쓰기 시작하면 답변 쓰는 중으로 보인다', { kind: 'answer' }, '답변 쓰는 중'],
   ['도구 실패는 재시도로 보인다', { kind: 'retry' }, '다시 시도하는 중'],
-  ['claude 의 실패는 이유와 함께 보인다', { kind: 'fail', text: 'error_max_turns' }, '실패: error_max_turns'],
+  ['모델의 실패는 이유와 함께 보인다', { kind: 'fail', text: 'error_max_turns' }, '실패: error_max_turns'],
   ['서버 오류는 이유와 함께 보인다', { kind: 'error', text: 'boom' }, '오류: boom'],
   ['끝나면 완료로 보인다', { kind: 'end' }, '완료'],
   ['답변은 진행 표시가 아니라 대화에 보인다', { kind: 'reply', text: '고쳤습니다' }, null],

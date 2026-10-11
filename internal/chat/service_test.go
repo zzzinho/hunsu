@@ -10,23 +10,27 @@ import (
 	"testing"
 
 	"hunsu/internal/chat"
-	"hunsu/internal/claude"
+	"hunsu/internal/llm"
 	"hunsu/internal/project"
 	"hunsu/internal/project/projecttest"
 	"hunsu/internal/ui"
 )
 
-type fakeRunner struct {
-	requests []claude.Request
+type fakeProvider struct {
+	requests []llm.Request
 	writes   map[string]string
 	err      error
 	started  chan struct{}
 	release  chan struct{}
 }
 
-func (f *fakeRunner) Run(_ context.Context, req claude.Request, emit func(claude.Event)) error {
+func (f *fakeProvider) Models() []llm.Model {
+	return []llm.Model{{ID: "fast", Label: "빠름"}, {ID: "slow", Label: "느림"}}
+}
+
+func (f *fakeProvider) Run(_ context.Context, req llm.Request, emit func(llm.Event)) error {
 	f.requests = append(f.requests, req)
-	emit(claude.Event{Kind: claude.Started, SessionID: "s1"})
+	emit(llm.Event{Kind: llm.Started, SessionID: "s1"})
 	if f.release != nil {
 		close(f.started)
 		<-f.release
@@ -42,13 +46,13 @@ func (f *fakeRunner) Run(_ context.Context, req claude.Request, emit func(claude
 type fixture struct {
 	t       *testing.T
 	svc     *chat.Service
-	runner  *fakeRunner
+	runner  *fakeProvider
 	project *project.Project
 }
 
 func newFixture(t *testing.T) *fixture {
 	p, _ := projecttest.New(t, map[string]string{"a.html": "a", "design.css": ":root { --color-primary: red; }"})
-	f := &fixture{t: t, runner: &fakeRunner{}, project: p}
+	f := &fixture{t: t, runner: &fakeProvider{}, project: p}
 	f.restart()
 	return f
 }
@@ -61,14 +65,14 @@ func (f *fixture) restart() {
 
 func (f *fixture) send(turn chat.Turn) string {
 	var events []string
-	err := f.svc.Send(context.Background(), turn, func(e claude.Event) { events = append(events, e.String()) })
+	err := f.svc.Send(context.Background(), turn, func(e llm.Event) { events = append(events, e.String()) })
 	if err != nil {
 		events = append(events, "error:"+err.Error())
 	}
 	return strings.Join(events, " ")
 }
 
-func (f *fixture) lastRequest() claude.Request { return f.runner.requests[len(f.runner.requests)-1] }
+func (f *fixture) lastRequest() llm.Request { return f.runner.requests[len(f.runner.requests)-1] }
 
 func (f *fixture) must(err error) {
 	f.t.Helper()
@@ -83,16 +87,16 @@ func TestService(t *testing.T) {
 		run  func(f *fixture) string
 		want string
 	}{
-		{"claude 의 진행 이벤트를 전달하고 마지막에 끝을 알린다",
+		{"provider 의 진행 이벤트를 전달하고 마지막에 끝을 알린다",
 			func(f *fixture) string { return f.send(chat.Turn{Prompt: "고쳐"}) },
 			"start end"},
-		{"claude 가 새로 만든 페이지를 알린다",
+		{"LLM 이 새로 만든 페이지를 알린다",
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"b.html": "b"}
 				return f.send(chat.Turn{Prompt: "b 페이지 만들어"})
 			},
 			"start created:b.html end"},
-		{"claude 가 실패하면 에러를 돌려준다",
+		{"provider 가 실패하면 에러를 돌려준다",
 			func(f *fixture) string {
 				f.runner.err = errors.New("boom")
 				return f.send(chat.Turn{Prompt: "고쳐"})
@@ -142,16 +146,16 @@ func TestService(t *testing.T) {
 			"true"},
 		{"고른 모델로 보낸다",
 			func(f *fixture) string {
-				f.send(chat.Turn{Prompt: "고쳐", Model: "haiku"})
+				f.send(chat.Turn{Prompt: "고쳐", Model: "slow"})
 				return f.lastRequest().Model
 			},
-			"haiku"},
-		{"모델을 고르지 않으면 opus 로 보낸다",
+			"slow"},
+		{"모델을 고르지 않으면 provider 의 기본(첫 번째) 모델로 보낸다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "고쳐"})
 				return f.lastRequest().Model
 			},
-			"opus"},
+			"fast"},
 		{"첫 응답의 세션을 다음 요청에서 이어간다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "1"})
@@ -177,7 +181,7 @@ func TestService(t *testing.T) {
 			""},
 		{"되돌리기는 마지막 요청 전 상태로 돌린다",
 			func(f *fixture) string {
-				f.runner.writes = map[string]string{"a.html": "claude 가 고침"}
+				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
 				f.send(chat.Turn{Prompt: "고쳐"})
 				f.must(f.svc.Undo())
 				data, err := f.project.Read("a.html")
@@ -191,7 +195,7 @@ func TestService(t *testing.T) {
 				done := make(chan string)
 				go func() { done <- f.send(chat.Turn{Prompt: "1"}) }()
 				<-f.runner.started
-				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(claude.Event) {}), " / ", f.svc.Undo(), " / ", f.svc.Checkpoint())
+				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(llm.Event) {}), " / ", f.svc.Undo(), " / ", f.svc.Checkpoint())
 				close(f.runner.release)
 				<-done
 				return got

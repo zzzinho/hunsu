@@ -101,6 +101,13 @@ async function open(path) {
   await refreshList();
 }
 
+async function loadModels() {
+  const models = await (await request('/api/models')).json();
+  const select = promptForm.elements.model;
+  select.replaceChildren(...models.map((model, i) => new Option(i === 0 ? `${model.label} (기본)` : model.label, model.id)));
+  select.hidden = models.length === 0;
+}
+
 function closeAll() {
   state = { open: null, preview: null };
   editor.setValue('');
@@ -416,4 +423,4 @@ window.onunhandledrejection = ({ reason }) => { status.textContent = reason.mess
 
 applyLayout();
 listenCommands();
-await openExisting();
+await Promise.all([loadModels(), openExisting()]);

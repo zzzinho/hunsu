@@ -14,23 +14,25 @@ import (
 	"time"
 
 	"hunsu/internal/chat"
-	"hunsu/internal/claude"
+	"hunsu/internal/llm"
 	"hunsu/internal/project/projecttest"
 	"hunsu/internal/server"
 	"hunsu/internal/ui"
 )
 
-type startRunner struct{}
+type startProvider struct{}
 
-func (startRunner) Run(_ context.Context, _ claude.Request, emit func(claude.Event)) error {
-	emit(claude.Event{Kind: claude.Started})
+func (startProvider) Models() []llm.Model { return []llm.Model{{ID: "fast", Label: "빠름"}} }
+
+func (startProvider) Run(_ context.Context, _ llm.Request, emit func(llm.Event)) error {
+	emit(llm.Event{Kind: llm.Started})
 	return nil
 }
 
 func newServer(t *testing.T) (http.Handler, string, *ui.Hub) {
 	t.Helper()
 	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "notes.txt": "notes.txt"})
-	svc, err := chat.New(p, startRunner{})
+	svc, err := chat.New(p, startProvider{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -62,6 +64,7 @@ func TestServer_API(t *testing.T) {
 		{"빈 채팅 요청은 거부한다", "POST", "/api/chat", `{"prompt":""}`, 400, "", ""},
 		{"되돌릴 것이 없으면 거부한다", "POST", "/api/undo", "", 409, "", ""},
 		{"새 대화를 시작한다", "POST", "/api/chat/reset", "", 204, "", ""},
+		{"provider 가 고를 수 있게 한 모델 목록을 준다", "GET", "/api/models", "", 200, `[{"id":"fast","label":"빠름"}]`, ""},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

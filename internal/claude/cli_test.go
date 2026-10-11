@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"hunsu/internal/claude"
+	"hunsu/internal/llm"
 )
 
 func TestCLI_Run(t *testing.T) {
@@ -33,11 +34,31 @@ func TestCLI_Run(t *testing.T) {
 			defer cancel()
 			var events []string
 			start := time.Now()
-			err = claude.CLI{Path: path}.Run(ctx, claude.Request{Dir: t.TempDir(), Prompt: tt.prompt},
-				func(e claude.Event) { events = append(events, e.String()) })
+			err = claude.CLI{Path: path}.Run(ctx, llm.Request{Dir: t.TempDir(), Prompt: tt.prompt},
+				func(e llm.Event) { events = append(events, e.String()) })
 			got := strings.Join(events, " ")
 			if got != tt.want || !errorContains(err, tt.wantErr) || time.Since(start) > 3*time.Second {
 				t.Errorf("Run() = %q, %v (%s 걸림); want %q, 에러 %q 포함", got, err, time.Since(start), tt.want, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestCLI_Models(t *testing.T) {
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"opus 를 기본(첫 번째)으로 sonnet, haiku 를 고를 수 있다", "opus sonnet haiku"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ids []string
+			for _, m := range (claude.CLI{}).Models() {
+				ids = append(ids, m.ID)
+			}
+			if got := strings.Join(ids, " "); got != tt.want {
+				t.Errorf("Models() = %q, want %q", got, tt.want)
 			}
 		})
 	}

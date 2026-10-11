@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"hunsu/internal/chat"
-	"hunsu/internal/claude"
+	"hunsu/internal/llm"
 )
 
 func (s *Server) sendChat(w http.ResponseWriter, r *http.Request) {
@@ -21,8 +21,15 @@ func (s *Server) sendChat(w http.ResponseWriter, r *http.Request) {
 	case err != nil && !stream.started:
 		writeError(w, err)
 	case err != nil:
-		stream.send(claude.Event{Kind: "error", Text: err.Error()})
+		stream.send(llm.Event{Kind: errorKind, Text: err.Error()})
 	}
+}
+
+const errorKind = "error"
+
+func (s *Server) models(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(s.chat.Models())
 }
 
 func (s *Server) resetChat(w http.ResponseWriter, r *http.Request) {
@@ -47,7 +54,7 @@ type eventStream struct {
 	started bool
 }
 
-func (e *eventStream) send(event claude.Event) {
+func (e *eventStream) send(event llm.Event) {
 	if !e.started {
 		e.w.Header().Set("Content-Type", "text/event-stream")
 		e.w.Header().Set("Cache-Control", "no-store")

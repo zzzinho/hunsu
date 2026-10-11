@@ -3,14 +3,14 @@
 HTML로 디자인하는 Figma. 로컬에서 서버를 띄우고 브라우저에서 HTML 원본을 직접 고치거나, LLM에게 말로 고치게 한다.
 
 - 작성일: 2026-10-09
-- 상태: 마일스톤 3 완료, Claude Code 연결(MCP) 완료
+- 상태: 마일스톤 3 완료, 외부 에이전트 연결(MCP) 완료, LLM provider 분리 완료
 
 ## 1. 목표와 비목표
 
 **목표**
 
 - 디자인 한 장 = HTML 파일 하나. 원본을 고치면 렌더 화면에 바로 반영된다.
-- 채팅으로 요청하면 LLM(`claude -p`)이 파일을 직접 고친다. 이전 요청의 맥락이 이어진다.
+- 채팅으로 요청하면 LLM 이 파일을 직접 고친다 (PoC 의 LLM 은 `claude -p`, 교체 가능). 이전 요청의 맥락이 이어진다.
 - 렌더 화면에서 요소를 클릭해 "이거"를 지정할 수 있다.
 - 프로젝트의 모든 디자인이 공통 디자인 규칙(디자인 시스템)을 공유한다. 규칙을 바꾸면 모든 페이지에 반영되고, LLM도 그 규칙을 따른다.
 - macOS 단일 실행파일 `./hunsu` 로 제공한다.
@@ -51,8 +51,9 @@ HTML로 디자인하는 Figma. 로컬에서 서버를 띄우고 브라우저에�
 | 캔버스 | 파일 1개 미리보기 + 모바일/데스크톱 너비 프리셋 | 다중 프레임 캔버스는 작업량이 크고, MVP 핵심(원본 편집·LLM 편집)과 무관하다. |
 | 요소 선택 | MVP 포함 | 약 50줄. LLM 요청이 정확해지고 Figma처럼 쓰는 느낌의 핵심. |
 | 디자인 시스템 | 프로젝트 루트의 `DESIGN.md`(글로 쓴 규칙) + `design.css`(CSS 변수와 공통 클래스) | 값은 CSS 변수라 브라우저가 모든 페이지에 그대로 적용한다. 별도 토큰 형식이나 변환 단계가 필요 없다. 6 참고. |
-| LLM 편집 방식 | claude 가 Edit 도구로 파일을 직접 수정 | 바뀐 부분만 고쳐서 출력 토큰이 적다. 전체 HTML 재생성은 파일이 커질수록 느려진다. |
-| 모델 | 채팅 창에 모델 선택(opus 기본 / sonnet / haiku). 모델을 고르지 않은 요청도 opus 로 보낸다 | 실측에서 haiku 가 2배 빠르고 20배 이상 싸다(14). 작은 수정은 haiku, 새 페이지는 기본 모델. |
+| LLM provider | `llm.Provider` 인터페이스 뒤에 둔다. PoC 는 Claude Code CLI(`claude -p`). 고르는 곳은 `main.go` 하나 | Anthropic API, Codex 등으로 바꾸거나 늘릴 수 있어야 한다. PoC 는 파일 편집 에이전트를 가장 빨리 얻는 CLI 를 썼다 (18) |
+| LLM 편집 방식 | LLM 이 자기 파일 편집 도구로 파일을 직접 수정 (PoC: claude 의 Edit) | 바뀐 부분만 고쳐서 출력 토큰이 적다. 전체 HTML 재생성은 파일이 커질수록 느려진다. |
+| 모델 | 모델 목록과 기본 모델(목록의 첫 번째)은 provider 가 정하고, 화면은 `/api/models` 로 받는다. PoC 의 claude provider 는 opus(기본) / sonnet / haiku. 모델을 고르지 않은 요청도 기본 모델로 보낸다 | 실측에서 haiku 가 2배 빠르고 20배 이상 싸다(14). 작은 수정은 haiku, 새 페이지는 기본 모델. |
 | 배포 대상 | 본인·소수 테스트 | 서명·공증 없이 진행. 받은 사람은 `xattr -d com.apple.quarantine hunsu` 를 한 번 실행한다. |
 
 ## 4. 화면 구성
@@ -91,11 +92,14 @@ HTML로 디자인하는 Figma. 로컬에서 서버를 띄우고 브라우저에�
  │   ├─ /            UI (embed.FS)
  │   ├─ /p/*         프로젝트 폴더 정적 서빙 → iframe 렌더 (상대 경로 이미지·CSS 동작)
  │   ├─ /api/files   목록·읽기·쓰기·새 파일
- │   ├─ /api/chat    POST: claude -p 실행, 진행 이벤트를 응답 스트림(SSE 형식)으로 전달. 연결을 끊으면 취소
+ │   ├─ /api/chat    POST: LLM provider 실행, 진행 이벤트를 응답 스트림(SSE 형식)으로 전달. 연결을 끊으면 취소
+ │   ├─ /api/models  provider 가 정한 모델 목록 (첫 번째가 기본)
  │   ├─ /api/chat/reset  새 대화
  │   ├─ /api/undo    직전 요청 전 상태로 복원
- │   └─ /api/events  SSE: 열린 페이지나 design.css 가 바뀌면 렌더·에디터 새로고침
- └─ os/exec → claude -p (작업 폴더 = 프로젝트 폴더)
+ │   ├─ /api/events  SSE: 열린 페이지나 design.css 가 바뀌면 렌더·에디터 새로고침
+ │   ├─ /api/ui·/api/ui/commands  브라우저 화면 상태 알림, 브라우저로 보내는 명령
+ │   └─ /mcp         외부 에이전트용 MCP 서버 (17)
+ └─ llm.Provider (PoC: os/exec → claude -p, 작업 폴더 = 프로젝트 폴더) (18)
 ```
 
 **프로젝트 폴더 구조**
@@ -148,7 +152,9 @@ designs/
 
 - 디자인 시스템이 커지면 매 호출의 system prompt 가 커진다. 문제가 되면 내용 대신 "필요하면 `design.css` 를 읽어라" 로 바꾼다.
 
-## 7. LLM 호출
+## 7. LLM 호출 (PoC provider: `internal/claude`)
+
+이 절은 PoC provider 인 Claude Code CLI 의 구현이다. 다른 provider 는 18 의 `llm.Provider` 계약만 지키면 되고, 아래 플래그와는 관계없다.
 
 ```
 claude -p \
@@ -228,7 +234,7 @@ claude -p \
 - `[알림]` 줄은 서버가 claude 실행 직후 편집 대상 파일 전체의 해시를 기억해 두고, 다음 요청 때 달라진 파일을 붙인다. 되돌리기도 claude 가 모르는 변경이라 여기에 포함된다. 이 줄이 없으면 claude 는 예전 내용으로 Edit 를 시도했다가 실패하고, 다시 읽느라 한 턴을 더 쓴다. 결과는 맞지만 6초짜리가 17초가 된다(14). 이 줄로 얼마나 줄어드는지는 구현 때 측정한다.
 - 선택한 요소의 HTML 은 2000자에서 자른다.
 
-**대화가 길어질 때**: Claude Code 의 자동 압축에 맡긴다. 문제가 되면 `--autocompact` 로 조정한다.
+**대화가 길어질 때**: provider 에 맡긴다 (PoC: Claude Code 의 자동 압축). 문제가 되면 `--autocompact` 로 조정한다.
 
 ## 9. 요소 선택과 렌더 화면 도구
 
@@ -286,7 +292,8 @@ lipo -create -output hunsu hunsu-arm64 hunsu-amd64
 - [x] **1. 서버 + 렌더 + 소스 편집** — 파일 목록(디자인 시스템 고정), iframe 렌더, CodeMirror 편집·저장, 변경 감지 SSE, 새 파일 템플릿
 - [x] **2. LLM 채팅** — claude -p 실행, 단계별 진행 표시, 세션 이어가기, 디자인 시스템 주입, 수동 편집 알림, 모델 선택, 취소, 스냅샷 되돌리기
 - [x] **3. 요소 선택** — 선택·손 도구, 외곽선, 선택자·HTML 첨부, 새로고침 후 선택 유지
-- [x] **MCP** — Claude Code 연결: `get_context`·`checkpoint`·`undo`·`open_page`, 토큰 인증, 고정 포트 (17)
+- [x] **LLM provider 분리** — `llm.Provider` 계약, claude 는 구현 하나, 모델 목록은 provider 가 정함 (18)
+- [x] **MCP** — 외부 에이전트 연결: `get_context`·`checkpoint`·`undo`·`open_page`, 토큰 인증, 고정 포트 (17)
 - [ ] **4. 패키징과 보안** — 토큰·Host·Origin 검사, `claude` 확인, universal 빌드 (경로 검사는 1 에서 완료)
 
 ## 14. 스파이크 결과 (2026-10-09, claude 2.1.295)
@@ -340,25 +347,25 @@ lipo -create -output hunsu hunsu-arm64 hunsu-amd64
 
 - 빈 프로젝트에서 claude 가 없는 파일을 먼저 읽으려다 실패해 "다시 시도하는 중" 이 두 번 보이고 약 4초를 쓴다. 프롬프트에 현재 파일 목록을 넣으면 줄일 수 있다.
 
-## 17. Claude Code 연결 (MCP)
+## 17. 외부 에이전트 연결 (MCP)
 
-브라우저 채팅(hunsu 가 `claude -p` 를 실행)과 반대 방향이다. 사용자의 Claude Code 세션이 hunsu 에 MCP 로 접속하고, hunsu 는 화면과 브라우저 상태를 알려주는 쪽이 된다. 두 방식은 함께 쓴다.
+브라우저 채팅(hunsu 가 LLM provider 를 실행)과 반대 방향이다. 사용자의 에이전트(Claude Code, Codex 등 MCP 클라이언트)가 hunsu 에 MCP 로 접속하고, hunsu 는 화면과 브라우저 상태를 알려주는 쪽이 된다. 두 방식은 함께 쓴다.
 
 **결정**
 
 | 항목 | 결정 | 이유 |
 |---|---|---|
-| 파일 수정 | Claude Code 의 기본 Edit·Write 로 직접 | Claude Code 가 그쪽을 더 잘 쓴다. hunsu 는 파일 변경을 감지해 다시 그리기만 하면 된다 |
+| 파일 수정 | 에이전트 자신의 파일 편집 도구로 직접 | 에이전트는 자기 도구를 가장 잘 쓴다. hunsu 는 파일 변경을 감지해 다시 그리기만 하면 된다 |
 | 도구 | `get_context`, `checkpoint`, `undo`, `open_page` 네 개 | 브라우저 상태를 알려주는 것과 되돌리기 연결만 hunsu 가 해야 하는 일이다 |
-| 전송 방식 | 이미 떠 있는 HTTP 서버의 `/mcp` (Streamable HTTP, 응답 하나짜리) | hunsu 와 브라우저 상태를 공유하려면 같은 프로세스여야 한다. stdio 는 Claude Code 가 별도 프로세스를 띄운다 |
+| 전송 방식 | 이미 떠 있는 HTTP 서버의 `/mcp` (Streamable HTTP, 응답 하나짜리) | hunsu 와 브라우저 상태를 공유하려면 같은 프로세스여야 한다. stdio 는 클라이언트가 별도 프로세스를 띄운다 |
 | 구현 | 표준 라이브러리로 JSON-RPC 직접 처리 (`initialize`, `ping`, `tools/list`, `tools/call`) | 도구 호출만 쓴다. 외부 의존성 0 유지 |
 | 포트 | 기본 7777 고정 | 등록한 MCP 주소가 실행할 때마다 바뀌면 안 된다 |
 | 인증 | `Authorization: Bearer <토큰>`. 토큰은 사용자 설정 폴더에 0600 으로 한 번 만들어 재사용 | `/mcp` 는 파일 되돌리기를 열어 준다. 등록이 깨지지 않도록 토큰도 고정한다 |
-| 화면 상태 | 브라우저가 `POST /api/ui` 로 보는 페이지·선택한 요소를 알린다. 같은 출처(Origin)만 받는다 | 다른 웹사이트가 가짜 선택 요소를 넣어 Claude Code 에 지시를 끼워 넣는 것(프롬프트 주입)을 막는다 |
+| 화면 상태 | 브라우저가 `POST /api/ui` 로 보는 페이지·선택한 요소를 알린다. 같은 출처(Origin)만 받는다 | 다른 웹사이트가 가짜 선택 요소를 넣어 에이전트에 지시를 끼워 넣는 것(프롬프트 주입)을 막는다 |
 | 브라우저 명령 | `GET /api/ui/commands` SSE 로 `open` 명령을 보낸다 | `open_page` 가 브라우저 화면을 움직일 수 있게 |
-| 디자인 규칙 | `internal/project/rules.md` 하나를 브라우저 채팅 지시문과 MCP 안내문이 함께 쓴다 | 두 경로가 같은 규칙을 따르게 |
+| 디자인 규칙 | `internal/project/rules.md` 하나를 브라우저 채팅 지시문과 MCP 안내문이 함께 쓴다. 안내문은 특정 클라이언트의 도구 이름을 쓰지 않는다 | 두 경로가 같은 규칙을 따르게 |
 
-**실측 (2026-10-09, `claude -p` + `--mcp-config`, haiku)**
+**실측 (2026-10-09, MCP 클라이언트로 Claude Code `claude -p` + `--mcp-config`, haiku)**
 
 브라우저에서 제목을 선택한 뒤 "내가 선택한 요소 글자색을 #dc2626 으로 바꾸고, about.html 을 같은 디자인으로 만들어 브라우저에 열어줘" 로 요청했다. 14.7초.
 
@@ -370,3 +377,26 @@ lipo -create -output hunsu hunsu-arm64 hunsu-amd64
 
 - `screenshot` 도구: 렌더 결과를 이미지로 돌려줘 Claude Code 가 결과를 보고 다듬게 한다. 서버가 headless Chrome 을 실행해야 해서 미뤘다.
 - Claude Code 가 `open_page` 없이 새 페이지를 만들면 브라우저 파일 목록이 바로 갱신되지 않는다.
+
+## 18. LLM provider 와 외부 에이전트
+
+hunsu 는 특정 LLM 이나 에이전트를 전제하지 않는다. SRP·OCP 를 지키는 이유가 이것이다. PoC 에서 Claude Code CLI 를 쓴 것은 구현 선택일 뿐이다.
+
+| 방향 | 통로 | 지금 붙어 있는 것 | 교체·추가 |
+|---|---|---|---|
+| hunsu → LLM (브라우저 채팅) | `llm.Provider` | `internal/claude` (`claude -p`) | Anthropic API, Codex 등. `main.go` 의 `provider()` 에서 고른다 |
+| 외부 에이전트 → hunsu | MCP (표준 프로토콜) | 어떤 MCP 클라이언트든 | Claude Code, Codex, Cursor 등. 코드 변경 없이 등록만 한다 |
+
+**`llm.Provider` 계약** (`internal/llm`)
+
+- `Run(ctx, Request, emit)`: `Request.Dir` 의 디자인 파일을 직접 고친다. 진행 상황은 `llm.Event` 의 공통 종류(start, think, read, write, answer, retry, reply, fail)로 알린다. 대화를 이어갈 ID 가 있으면 `Started` 이벤트의 `SessionID` 로 알리고, 다음 요청의 `Request.SessionID` 로 돌려받는다. ctx 가 취소되면 멈춘다.
+- `Models()`: 사용자가 고를 수 있는 모델. 첫 번째가 기본이다. 고를 것이 없으면 빈 목록을 돌려주고, 화면은 모델 선택을 숨긴다.
+- 프롬프트·디자인 시스템 조립, 동시 실행 막기, 스냅샷·되돌리기, 직접 고친 파일 알림은 provider 밖(`internal/chat`)에서 처리한다. provider 는 실행만 맡는다.
+
+**provider 를 추가하는 방법**
+
+1. `internal/<이름>` 패키지에 `llm.Provider` 를 구현한다. provider 고유의 것(실행 방법, 이벤트 해석, 모델 이름, 격리 방식)은 모두 이 패키지 안에 둔다.
+2. `main.go` 의 `provider()` 에서 그 구현을 고른다. 여러 provider 를 함께 두려면 그때 실행 옵션을 추가한다.
+3. 핵심 패키지(`chat`, `server`, `mcp*`, `web/`)는 고치지 않는다. 고쳐야 한다면 계약이 부족한 것이므로 `llm` 계약부터 고친다.
+
+provider 마다 다른 점은 구현 안에서 해결한다. 예를 들어 파일 편집 도구가 없는 API 형 provider 는 hunsu 쪽에서 디자인 폴더로 한정된 파일 도구를 제공하는 도구 호출 루프를 provider 안에 둔다. 격리(사용자 설정을 섞지 않기)와 폴더 밖 접근 차단도 각 provider 가 보장해야 한다.
