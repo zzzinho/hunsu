@@ -24,6 +24,8 @@ import (
 
 type startProvider struct{}
 
+func (startProvider) Status(context.Context) llm.Status { return llm.Status{Ready: true} }
+
 func (startProvider) Name() string { return "start" }
 
 func (startProvider) Models() []llm.Model { return []llm.Model{{ID: "fast", Label: "빠름"}} }
@@ -101,6 +103,7 @@ func TestServer_API(t *testing.T) {
 		{"빈 채팅 요청은 거부한다", "POST", "/api/chat", `{"prompt":""}`, 400, "", ""},
 		{"되돌릴 것이 없으면 거부한다", "POST", "/api/undo", "", 409, "", ""},
 		{"새 대화를 시작한다", "POST", "/api/chat/reset", "", 204, "", ""},
+		{"provider 의 이름과 지금 쓸 수 있는지를 준다", "GET", "/api/status", "", 200, `{"provider":"start","ready":true}`, ""},
 		{"provider 가 고를 수 있게 한 모델 목록을 준다", "GET", "/api/models", "", 200, `[{"id":"fast","label":"빠름"}]`, ""},
 	}
 	for _, tt := range tests {

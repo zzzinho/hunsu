@@ -18,6 +18,8 @@ import (
 
 type idleProvider struct{}
 
+func (idleProvider) Status(context.Context) llm.Status { return llm.Status{Ready: true} }
+
 func (idleProvider) Name() string { return "idle" }
 
 func (idleProvider) Models() []llm.Model { return nil }

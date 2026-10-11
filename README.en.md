@@ -22,16 +22,23 @@ The UI is in English by default; switch to Korean from the language menu above t
 - macOS
 - LLM for the browser chat: [Claude Code](https://claude.com/claude-code) CLI (`claude`) or [Codex](https://github.com/openai/codex) CLI (`codex`), logged in
 - Chrome (optional): lets the LLM look at the rendered result. Chromium, Edge and Brave work too; without one, only this feature is off
-- Go 1.27+: build only
+- Go 1.27+: only to build from source
+
+## Install
+
+```bash
+brew install zzzinho/hunsu/hunsu
+```
+
+To build from source, run `go build -o hunsu .` with Go 1.27+.
 
 ## Run
 
 ```bash
-go build -o hunsu .
-./hunsu ~/designs      # defaults to the current directory
+hunsu ~/designs      # defaults to the current directory
 ```
 
-Serves at `http://127.0.0.1:7777` and opens your browser. `-port 8888` changes the port, `-no-open` skips the browser. `-provider codex` picks the LLM (by default the first installed of claude, codex).
+Serves at `http://127.0.0.1:7777` and opens your browser. `-port 8888` changes the port, `-no-open` skips the browser. `-provider codex` picks the LLM (by default the first installed of claude, codex). If it is not installed or logged in, the terminal and the chat tell you which command to run.
 
 ## Usage
 
@@ -152,6 +159,8 @@ Measurements: [`PLAN.md`](PLAN.md) section 11.
 go test ./... && node --test web/
 ```
 
+Release: pushing a `v*` tag makes GitHub Actions upload a universal binary to the release. With a `HOMEBREW_TAP_TOKEN` secret it also updates the formula in `<owner>/homebrew-hunsu`.
+
 | Path | Responsibility |
 |---|---|
 | `main.go` | Composition: flags, provider choice, server start |
@@ -172,7 +181,7 @@ No external dependencies. Coding rules: [`CLAUDE.md`](CLAUDE.md); decisions and 
 
 ## Limitations
 
-- localhost protection is partial (`/mcp` token, `/api/ui` origin check); the rest comes before the v1 release.
+- The render view (iframe) shares hunsu's origin, so JavaScript in a design page can call hunsu's API. Do not open untrusted HTML.
 - Pages an agent creates without `open_page` appear in the list on the next interaction.
 - Tested on macOS only. Only root `.html` files are pages.
 - Classes or ids added by page JavaScript at runtime may end up in the selection path, so an LLM edit may not apply.

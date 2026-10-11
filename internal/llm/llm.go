@@ -11,6 +11,20 @@ type Provider interface {
 	Run(ctx context.Context, req Request, emit func(Event)) error
 	// Models 는 사용자가 고를 수 있는 모델이다. 첫 번째가 기본이다.
 	Models() []Model
+	// Status 는 지금 쓸 수 있는지다. 설치·로그인을 확인한다.
+	Status(ctx context.Context) Status
+}
+
+const (
+	NotInstalled = "not-installed"
+	NotLoggedIn  = "not-logged-in"
+)
+
+// Status 는 provider 를 쓸 수 있는지다. 쓸 수 없으면 Problem 과, 사용자가 터미널에서 실행할 Fix 명령을 알린다.
+type Status struct {
+	Ready   bool   `json:"ready"`
+	Problem string `json:"problem,omitempty"`
+	Fix     string `json:"fix,omitempty"`
 }
 
 type Request struct {

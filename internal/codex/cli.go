@@ -24,6 +24,16 @@ func (CLI) Name() string { return "codex" }
 
 func (CLI) Models() []llm.Model { return slices.Clone(models) }
 
+func (c CLI) Status(ctx context.Context) llm.Status {
+	if _, err := exec.LookPath(c.Path); err != nil {
+		return llm.Status{Problem: llm.NotInstalled, Fix: "brew install --cask codex"}
+	}
+	if exec.CommandContext(ctx, c.Path, "login", "status").Run() != nil {
+		return llm.Status{Problem: llm.NotLoggedIn, Fix: "codex login"}
+	}
+	return llm.Status{Ready: true}
+}
+
 func (c CLI) Run(ctx context.Context, req llm.Request, emit func(llm.Event)) error {
 	var stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, c.Path, Args(req)...)

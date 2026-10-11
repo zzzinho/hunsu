@@ -87,6 +87,15 @@ func New(p *project.Project, provider llm.Provider, opts Options) (*Service, err
 
 func (s *Service) Models() []llm.Model { return s.llm.Models() }
 
+type ProviderStatus struct {
+	Provider string `json:"provider"`
+	llm.Status
+}
+
+func (s *Service) Status(ctx context.Context) ProviderStatus {
+	return ProviderStatus{Provider: s.llm.Name(), Status: s.llm.Status(ctx)}
+}
+
 func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error {
 	if strings.TrimSpace(t.Prompt) == "" {
 		return ErrEmptyPrompt

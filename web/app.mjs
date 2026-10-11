@@ -143,6 +143,11 @@ async function open(path) {
 
 const modelLabel = (model, isDefault) => [model.label, model.fast && t('model.fast'), isDefault && t('model.default')].filter(Boolean).join(' ');
 
+async function checkStatus() {
+  const status = await (await request('/api/status')).json();
+  if (!status.ready) addMessage('notice', t(`status.${status.problem}`, { provider: status.provider, fix: status.fix }));
+}
+
 async function loadModels() {
   const models = await (await request('/api/models')).json();
   const select = promptForm.elements.model;
@@ -665,4 +670,4 @@ window.onunhandledrejection = ({ reason }) => { status.textContent = reason.mess
 applyLanguage();
 applyLayout();
 listenCommands();
-await Promise.all([loadModels(), openExisting()]);
+await Promise.all([loadModels(), openExisting(), checkStatus()]);

@@ -203,21 +203,21 @@ type Provider interface {
 
 **HTTP API**
 
-| 경로 | 역할 | 보호 (현재) |
+| 경로 | 역할 | 보호 (모두 127.0.0.1 + Host·Origin 검사) |
 |---|---|---|
-| `GET /`, `GET /p/*` | UI, 디자인 폴더 정적 서빙(`no-store`) | 127.0.0.1 |
-| `/api/files`, `/api/file`, `POST /api/assets` | 목록, 읽기·쓰기·새 파일, 에셋 올리기 | 127.0.0.1 + 파일 규칙 |
-| `GET /api/export/{zip,html,png}` | 내보내기 (첨부 파일로 응답) | 127.0.0.1 |
-| `POST /api/chat` | 요청 실행, 진행 이벤트 SSE. 연결을 끊으면 취소 | 127.0.0.1 |
-| `/api/models`, `/api/undo`, `/api/chat/reset` | 모델 목록, 되돌리기, 새 대화 | 127.0.0.1 |
-| `/api/versions`, `/api/versions/{restore,thumb}` | 버전 목록·저장, 복원, 썸네일 | 127.0.0.1 |
-| `POST /api/chat/variants`, `/api/variants`, `/api/variants/{choose,discard}`, `GET /variant/<n>/*` | 비교안 만들기(SSE), 목록, 고르기·버리기, 안 렌더(없는 파일은 디자인 폴더에서) | 127.0.0.1 |
-| `GET /api/events` | 지정한 파일의 변경 알림 (SSE) | 127.0.0.1 |
-| `POST /api/ui`, `GET /api/ui/commands` | 화면 상태 보고, 브라우저 명령 (SSE) | 보고는 + Origin |
+| `GET /`, `GET /p/*` | UI, 디자인 파일만 정적 서빙(`no-store`) | 페이지·디자인 시스템·에셋만 |
+| `/api/files`, `/api/file`, `POST /api/assets` | 목록, 읽기·쓰기·새 파일, 에셋 올리기 | 파일 규칙 |
+| `GET /api/export/{zip,html,png}` | 내보내기 (첨부 파일로 응답) | - |
+| `POST /api/chat` | 요청 실행, 진행 이벤트 SSE. 연결을 끊으면 취소 | - |
+| `/api/models`, `/api/status`, `/api/undo`, `/api/chat/reset` | 모델 목록, provider 상태(설치·로그인), 되돌리기, 새 대화 | - |
+| `/api/versions`, `/api/versions/{restore,thumb}` | 버전 목록·저장, 복원, 썸네일 | - |
+| `POST /api/chat/variants`, `/api/variants`, `/api/variants/{choose,discard}`, `GET /variant/<n>/*` | 비교안 만들기(SSE), 목록, 고르기·버리기, 안 렌더(없는 에셋은 디자인 폴더에서) | 렌더는 디자인 파일만 |
+| `GET /api/events` | 지정한 파일의 변경 알림 (SSE) | - |
+| `POST /api/ui`, `GET /api/ui/commands` | 화면 상태 보고, 브라우저 명령 (SSE) | 보고는 출처가 없어도 거부 |
 | `POST /mcp` | MCP (외부 에이전트) | + Bearer 토큰 |
 | `POST /mcp/render` | MCP, `screenshot` 만 (내장 provider) | + Bearer 토큰 |
 
-(v1) 마일스톤 4 에서 나머지 API 에 Host·Origin 검사를 더한다.
+오류는 `{"code","message"}` 로 응답한다. 화면이 코드를 사용자 언어로 바꾼다.
 
 ### 3.5 데이터 저장
 
@@ -239,7 +239,7 @@ type Provider interface {
 
 | 마일스톤 | 설계 | 바뀌는 경계 |
 |---|---|---|
-| 4. 보안·설치 | 나머지 API 에 Host·Origin 검사. `Provider.Status()`. universal 바이너리를 GitHub Release + Homebrew tap 으로 | server, llm 계약 |
+| 4. 보안·설치 (구현됨) | 나머지 API 에 Host·Origin 검사. `Provider.Status()`. universal 바이너리를 GitHub Release + Homebrew tap 으로 | server, llm 계약, `.github/workflows/release.yml` |
 | 5. 영어 UI (구현됨) | 번역 모듈. LLM 은 사용자가 쓴 언어로 답한다. 프롬프트 라벨·터미널 출력은 영어 | web, chat 프롬프트, server 오류, llm.Model, history.Note |
 | 6. 에셋 (구현됨) | `assets/` 에 끌어다 놓아 업로드(이미지·폰트, 10MB). 목록을 프롬프트와 `get_context` 에 | project, 디자인 규칙 |
 | 7. 텍스트 직접 수정 (구현됨) | 렌더에서 더블클릭해 고친 문구를 원본에 반영. 같은 문구 중 몇 번째인지로 원본 위치를 찾는다 | web |
@@ -314,9 +314,10 @@ type Provider interface {
 | 위협 | 현재 | (v1)·한계 |
 |---|---|---|
 | 원격 접속 | `127.0.0.1` 만 바인딩 | - |
-| 다른 사이트가 localhost API 호출 (CSRF) | `/mcp` 토큰(상수 시간 비교), `/api/ui` Origin 검사. 나머지 API 는 미보호 | 마일스톤 4: 나머지 API 에 Host·Origin |
-| DNS rebinding | 토큰이 있는 `/mcp` 외에는 미보호. `/api/ui` 의 Origin 검사도 Host 헤더와 비교한다 | 마일스톤 4: Host 검사 |
-| 가짜 선택 요소로 에이전트에 지시 주입 | `/api/ui` 는 같은 출처만 받는다 | Host 검사 전까지 rebinding 에 열려 있다 |
+| 다른 사이트가 localhost API 호출 (CSRF) | 모든 요청에서 Origin 이 있는데 자기 출처가 아니면 거부(`null` 포함). 출처가 없으면 브라우저가 아닌 로컬 프로그램으로 보고 받는다. `/mcp` 는 토큰(상수 시간 비교)도 | 브라우저는 출처를 감출 수 없다 |
+| DNS rebinding | 모든 요청에서 호스트 이름이 `127.0.0.1`·`localhost` 가 아니면 거부 | - |
+| 가짜 선택 요소로 에이전트에 지시 주입 | `/api/ui` 는 같은 출처만 받는다(출처가 없어도 거부) | - |
+| `.hunsu/` 등 디자인 밖 파일 노출 | 렌더용 서빙은 페이지·디자인 시스템·에셋만 준다. 폴더 목록 없음 | - |
 | 폴더 밖 파일 접근 | 파일 API: 이름 규칙 + 일반 파일 + `os.Root`. claude provider: `--restricted` + `Read,Edit,Write` 만. 상대·절대 경로, 심볼릭 링크 모두 차단 확인 | API 형 provider 는 같은 보장을 provider 안에서 한다 |
 | 디자인 파일 속 프롬프트 주입 | provider 격리로 피해 범위를 디자인 폴더 안 편집으로 한정한다. 명령 실행 없음 | 외부 HTML·에셋을 들이면 커진다 |
 | 디자인 JS 가 hunsu API 호출 | 미보호. iframe 이 같은 출처다 | 외부 HTML 을 들일 때 포트를 분리한다 |

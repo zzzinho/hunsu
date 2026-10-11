@@ -45,6 +45,7 @@ func New(p *project.Project, c *chat.Service, hub *ui.Hub, web fs.FS, pollEvery 
 	mux.HandleFunc("POST /api/variants/discard", s.discardVariants)
 	mux.HandleFunc("GET /variant/{id}/{path...}", s.variantFile)
 	mux.HandleFunc("GET /api/models", s.models)
+	mux.HandleFunc("GET /api/status", s.status)
 	mux.HandleFunc("POST /api/undo", s.undo)
 	mux.HandleFunc("GET /api/versions", s.versions)
 	mux.HandleFunc("POST /api/versions", s.saveVersion)
