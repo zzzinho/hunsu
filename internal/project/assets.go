@@ -7,7 +7,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"slices"
 	"strings"
 )
 
@@ -21,11 +20,17 @@ var (
 	ErrTooLarge = errors.New("에셋은 10MB 까지")
 )
 
-var assetTypes = []string{".png", ".jpg", ".jpeg", ".gif", ".webp", ".avif", ".svg", ".woff", ".woff2", ".ttf", ".otf"}
+var assetTypes = map[string]string{
+	".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp",
+	".avif": "image/avif", ".svg": "image/svg+xml",
+	".woff": "font/woff", ".woff2": "font/woff2", ".ttf": "font/ttf", ".otf": "font/otf",
+}
+
+// AssetType 은 에셋의 MIME 타입이다. 에셋이 아니면 빈 문자열이다.
+func AssetType(name string) string { return assetTypes[strings.ToLower(filepath.Ext(name))] }
 
 func isAsset(name string) bool {
-	return filepath.Base(name) == name && !strings.HasPrefix(name, ".") &&
-		slices.Contains(assetTypes, strings.ToLower(filepath.Ext(name)))
+	return filepath.Base(name) == name && !strings.HasPrefix(name, ".") && AssetType(name) != ""
 }
 
 func (p *Project) AddAsset(name string, r io.Reader) error {

@@ -202,6 +202,7 @@ type Provider interface {
 |---|---|---|
 | `GET /`, `GET /p/*` | UI, 디자인 폴더 정적 서빙(`no-store`) | 127.0.0.1 |
 | `/api/files`, `/api/file`, `POST /api/assets` | 목록, 읽기·쓰기·새 파일, 에셋 올리기 | 127.0.0.1 + 파일 규칙 |
+| `GET /api/export/{zip,html,png}` | 내보내기 (첨부 파일로 응답) | 127.0.0.1 |
 | `POST /api/chat` | 요청 실행, 진행 이벤트 SSE. 연결을 끊으면 취소 | 127.0.0.1 |
 | `/api/models`, `/api/undo`, `/api/chat/reset` | 모델 목록, 되돌리기, 새 대화 | 127.0.0.1 |
 | `GET /api/events` | 지정한 파일의 변경 알림 (SSE) | 127.0.0.1 |
@@ -235,7 +236,7 @@ type Provider interface {
 | 6. 에셋 (구현됨) | `assets/` 에 끌어다 놓아 업로드(이미지·폰트, 10MB). 목록을 프롬프트와 `get_context` 에 | project, 디자인 규칙 |
 | 7. 텍스트 직접 수정 (구현됨) | 렌더에서 더블클릭해 고친 문구를 원본에 반영. 같은 문구 중 몇 번째인지로 원본 위치를 찾는다 | web |
 | 8. 렌더러 (구현됨) | headless Chrome 스크린샷. `screenshot` 도구 공용. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 끈다 (A17) | 새 패키지, mcptools, provider |
-| 9. 내보내기 | 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용) | 새 패키지 |
+| 9. 내보내기 (구현됨) | 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용) | 새 패키지 `export`, server |
 | 10. 버저닝 | 3.3 되돌리기·버저닝의 타임라인 | history 대체 |
 | 11. Codex provider | `codex exec --json`. provider 선택, provider 별 대화 ID. provider 계약이 실제로 교체 가능한지 확인하는 첫 사례 | 새 provider 패키지, main.go, session |
 | 12. 비교안 (옵션) | 한 요청에 2~3안, 나란히 보기. 고른 안이 페이지가 되고 나머지는 버전에 남는다 | chat, web, 버저닝 |

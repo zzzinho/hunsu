@@ -194,6 +194,25 @@ func TestProject_AddAsset(t *testing.T) {
 	}
 }
 
+func TestAssetType(t *testing.T) {
+	tests := []struct {
+		name string
+		file string
+		want string
+	}{
+		{"이미지 에셋의 MIME 타입을 알려준다", "assets/logo.PNG", "image/png"},
+		{"폰트 에셋의 MIME 타입을 알려준다", "assets/body.woff2", "font/woff2"},
+		{"에셋이 아니면 빈 문자열이다", "assets/notes.txt", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := project.AssetType(tt.file); got != tt.want {
+				t.Errorf("AssetType(%q) = %q, want %q", tt.file, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestListing_Files(t *testing.T) {
 	tests := []struct {
 		name    string

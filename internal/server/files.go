@@ -8,8 +8,10 @@ import (
 	"net/http"
 
 	"hunsu/internal/chat"
+	"hunsu/internal/export"
 	"hunsu/internal/history"
 	"hunsu/internal/project"
+	"hunsu/internal/render"
 )
 
 var errorStatus = []struct {
@@ -19,6 +21,9 @@ var errorStatus = []struct {
 	{project.ErrNotEditable, http.StatusForbidden},
 	{project.ErrNotAsset, http.StatusUnsupportedMediaType},
 	{project.ErrTooLarge, http.StatusRequestEntityTooLarge},
+	{export.ErrNotPage, http.StatusNotFound},
+	{render.ErrWidth, http.StatusBadRequest},
+	{errNoRenderer, http.StatusNotImplemented},
 	{fs.ErrNotExist, http.StatusNotFound},
 	{fs.ErrExist, http.StatusConflict},
 	{chat.ErrEmptyPrompt, http.StatusBadRequest},

@@ -3,6 +3,7 @@ package server_test
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -30,7 +31,18 @@ func (startProvider) Run(_ context.Context, _ llm.Request, emit func(llm.Event))
 	return nil
 }
 
+type fakeRenderer struct{}
+
+func (fakeRenderer) Screenshot(_ context.Context, page string, width, _ int) ([]byte, error) {
+	return fmt.Appendf(nil, "png:%s@%d", page, width), nil
+}
+
 func newServer(t *testing.T) (http.Handler, string, *ui.Hub) {
+	t.Helper()
+	return newServerWith(t, fakeRenderer{})
+}
+
+func newServerWith(t *testing.T, renderer server.Renderer) (http.Handler, string, *ui.Hub) {
 	t.Helper()
 	p, dir := projecttest.New(t, map[string]string{"page.html": "page.html", "notes.txt": "notes.txt"})
 	svc, err := chat.New(p, startProvider{})
@@ -39,7 +51,7 @@ func newServer(t *testing.T) (http.Handler, string, *ui.Hub) {
 	}
 	web := fstest.MapFS{"index.html": {Data: []byte("<title>hunsu</title>")}}
 	hub := ui.NewHub()
-	return server.New(p, svc, hub, web, 10*time.Millisecond), dir, hub
+	return server.New(p, svc, hub, web, 10*time.Millisecond, renderer), dir, hub
 }
 
 func TestServer_API(t *testing.T) {
@@ -63,6 +75,9 @@ func TestServer_API(t *testing.T) {
 		{"에셋을 올린다", "POST", "/api/assets?name=logo.png", "png", 201, "", ""},
 		{"이미지·폰트가 아닌 에셋은 거부한다", "POST", "/api/assets?name=a.js", "js", 415, "", ""},
 		{"10MB 를 넘는 에셋은 거부한다", "POST", "/api/assets?name=big.png", strings.Repeat("x", project.MaxAssetSize+1), 413, "", ""},
+		{"디자인 폴더를 ZIP 으로 내보낸다", "GET", "/api/export/zip", "", 200, "page.html", "Content-Type: application/zip"},
+		{"페이지를 파일 하나짜리 HTML 로 내보낸다", "GET", "/api/export/html?page=page.html", "", 200, "page.html", "Content-Disposition: attachment; filename=page.html"},
+		{"페이지가 아닌 파일은 HTML 로 내보내지 않는다", "GET", "/api/export/html?page=notes.txt", "", 404, "", ""},
 		{"렌더용 프로젝트 파일은 캐시 없이 준다", "GET", "/p/page.html", "", 200, "page.html", "Cache-Control: no-store"},
 		{"채팅 요청의 진행 이벤트를 스트림으로 보낸다", "POST", "/api/chat", `{"prompt":"고쳐"}`, 200, `data: {"kind":"start"}`, "Content-Type: text/event-stream"},
 		{"빈 채팅 요청은 거부한다", "POST", "/api/chat", `{"prompt":""}`, 400, "", ""},
@@ -79,6 +94,31 @@ func TestServer_API(t *testing.T) {
 			if rec.Code != tt.wantStatus || !strings.Contains(rec.Body.String(), tt.wantBody) || rec.Header().Get(key) != value {
 				t.Errorf("%s %s = %d %q %v; want %d, %q 포함, %q",
 					tt.method, tt.target, rec.Code, rec.Body, rec.Header(), tt.wantStatus, tt.wantBody, tt.wantHeader)
+			}
+		})
+	}
+}
+
+func TestServer_ExportPNG(t *testing.T) {
+	tests := []struct {
+		name       string
+		renderer   server.Renderer
+		target     string
+		wantStatus int
+		wantBody   string
+	}{
+		{"페이지를 고른 너비로 렌더해 PNG 로 내보낸다", fakeRenderer{}, "/api/export/png?page=page.html&width=390", 200, "png:page.html@390"},
+		{"너비를 정하지 않으면 기본 너비로 내보낸다", fakeRenderer{}, "/api/export/png?page=page.html", 200, "png:page.html@1280"},
+		{"페이지가 아니면 PNG 로 내보내지 않는다", fakeRenderer{}, "/api/export/png?page=notes.txt", 404, ""},
+		{"Chrome 이 없으면 PNG 로 내보내지 않고 이유를 알린다", nil, "/api/export/png?page=page.html", 501, "Chrome"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, _, _ := newServerWith(t, tt.renderer)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest("GET", tt.target, nil))
+			if rec.Code != tt.wantStatus || !strings.Contains(rec.Body.String(), tt.wantBody) {
+				t.Errorf("GET %s = %d %q; want %d, %q 포함", tt.target, rec.Code, rec.Body, tt.wantStatus, tt.wantBody)
 			}
 		})
 	}

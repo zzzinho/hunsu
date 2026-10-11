@@ -5,6 +5,7 @@ import { elapsedText, parseSSE, stepText } from './chat.mjs';
 import { createFrameTools } from './frame.mjs';
 import { toolForKey } from './tools.mjs';
 import { replaceText } from './textedit.mjs';
+import { exportURL, filenameOf } from './download.mjs';
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => document.querySelectorAll(selector);
@@ -206,6 +207,17 @@ async function editText(edit) {
     throw new Error('원본에서 이 문구를 찾지 못해 반영하지 않았습니다. 페이지 JS 가 만든 문구일 수 있습니다');
   }
   await request(fileURL(page), { method: 'PUT', body: next });
+}
+
+async function download(kind) {
+  $('#export').open = false;
+  status.textContent = '내보내는 중…';
+  const res = await request(exportURL(kind, state.preview, deviceWidth));
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(await res.blob());
+  link.download = filenameOf(res.headers.get('Content-Disposition') ?? '');
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
 }
 
 async function reloadEditor(path) {
@@ -445,6 +457,15 @@ $('#selection button').onclick = () => frameTools.clear();
 document.addEventListener('keydown', handleKey);
 acceptFileDrop(document);
 frame.addEventListener('load', () => acceptFileDrop(frame.contentDocument));
+$('#export').ontoggle = () => {
+  $$('[data-export][data-page]').forEach((button) => { button.disabled = !state.preview; });
+};
+$$('[data-export]').forEach((button) => {
+  button.onclick = () => download(button.dataset.export);
+});
+document.addEventListener('click', (event) => {
+  if (!event.target.closest('#export')) $('#export').open = false;
+});
 $('.upload input').onchange = async ({ target }) => {
   await upload(target.files);
   target.value = '';

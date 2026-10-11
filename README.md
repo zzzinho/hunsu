@@ -12,6 +12,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 렌더 화면을 보며 원본
 - **에셋**: 이미지·폰트를 끌어다 놓으면 LLM 이 페이지에 쓴다.
 - **외부 에이전트 (MCP)**: Claude Code, Codex 같은 MCP 클라이언트가 선택한 요소를 알고 직접 고친다.
 - **되돌리기**: 요청 하나를 통째로 되돌린다.
+- **내보내기**: 폴더 ZIP, 페이지별 HTML 파일 하나, PNG.
 
 ## 요구 사항
 
@@ -70,6 +71,16 @@ go build -o hunsu .
 **에셋**
 
 이미지(png·jpg·gif·webp·avif·svg)·폰트(woff·woff2·ttf·otf)를 화면에 끌어다 놓거나 [이미지·폰트 올리기] 로 고르면 `assets/` 에 저장된다. 파일당 10MB, 같은 이름은 거부한다. 목록은 요청마다 LLM 에게 전달된다. 되돌리기 대상이 아니며, 지우기는 Finder 에서 한다.
+
+**내보내기**
+
+화면 막대의 [내보내기] 에서 받는다.
+
+| 항목 | 내용 |
+|---|---|
+| 이 페이지 · HTML 파일 하나 | `design.css` 와 에셋을 넣은 HTML. 어디서 열어도 같다 |
+| 이 페이지 · PNG | 보고 있는 너비(모바일 390px, 데스크톱 1280px)로 전체 페이지. Chrome 필요 |
+| 전체 폴더 · ZIP | 디자인 시스템, 페이지, 에셋 (`.hunsu/` 제외) |
 
 **직접 편집**: 에디터에서 고치고 ⌘S. 다른 에디터로 고쳐도 0.5초 안에 반영되고, 다음 요청 때 LLM 에게 알린다.
 
@@ -140,6 +151,7 @@ go test ./... && node --test web/
 | `internal/claude` | PoC provider (`claude -p`) |
 | `internal/history` | 스냅샷과 되돌리기 |
 | `internal/render` | headless Chrome 스크린샷 |
+| `internal/export` | ZIP, 단일 HTML 내보내기 |
 | `internal/chat` | 요청 처리: 동시 실행 막기, 프롬프트 조립, 대화 이어가기 |
 | `internal/server` | 브라우저용 HTTP API |
 | `internal/ui` | 브라우저 화면 상태와 명령 |
