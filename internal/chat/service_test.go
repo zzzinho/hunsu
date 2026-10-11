@@ -198,6 +198,14 @@ func TestService(t *testing.T) {
 				return f.lastRequest().Prompt
 			},
 			designBlock + "[요청] 고쳐"},
+		{"사용자가 올린 에셋 목록을 요청마다 알린다",
+			func(f *fixture) string {
+				f.warmUp()
+				f.must(f.project.AddAsset("logo.png", strings.NewReader("png")))
+				f.send(chat.Turn{Prompt: "로고 넣어줘"})
+				return f.lastRequest().Prompt
+			},
+			"[에셋] assets/logo.png\n[요청] 로고 넣어줘"},
 		{"system prompt 는 디자인 시스템이 바뀌어도 그대로라 캐시를 깨지 않는다",
 			func(f *fixture) string {
 				f.warmUp()
@@ -251,6 +259,16 @@ func TestService(t *testing.T) {
 				return string(data)
 			},
 			"a"},
+		{"되돌려도 사용자가 올린 에셋은 남긴다",
+			func(f *fixture) string {
+				f.send(chat.Turn{Prompt: "고쳐"})
+				f.must(f.project.AddAsset("logo.png", strings.NewReader("png")))
+				f.must(f.svc.Undo())
+				listing, err := f.project.List()
+				f.must(err)
+				return strings.Join(listing.Assets, ",")
+			},
+			"assets/logo.png"},
 		{"요청을 처리하는 동안 다른 요청, 되돌리기, 체크포인트는 받지 않는다",
 			func(f *fixture) string {
 				f.runner.started, f.runner.release = make(chan struct{}), make(chan struct{})

@@ -17,6 +17,8 @@ var errorStatus = []struct {
 	status int
 }{
 	{project.ErrNotEditable, http.StatusForbidden},
+	{project.ErrNotAsset, http.StatusUnsupportedMediaType},
+	{project.ErrTooLarge, http.StatusRequestEntityTooLarge},
 	{fs.ErrNotExist, http.StatusNotFound},
 	{fs.ErrExist, http.StatusConflict},
 	{chat.ErrEmptyPrompt, http.StatusBadRequest},
@@ -58,6 +60,14 @@ func (s *Server) write(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	if err := s.project.Create(r.URL.Query().Get("path")); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusCreated)
+}
+
+func (s *Server) addAsset(w http.ResponseWriter, r *http.Request) {
+	if err := s.project.AddAsset(r.URL.Query().Get("name"), r.Body); err != nil {
 		writeError(w, err)
 		return
 	}

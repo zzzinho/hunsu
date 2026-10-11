@@ -90,6 +90,11 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); }
 .files li button.missing::after { content: " (만들기)"; }
 #new-page { display: flex; gap: 4px; margin-top: 10px; }
 #new-page input { flex: 1; min-width: 0; }
+.files li a { display: block; padding: 5px 8px; color: var(--text-muted); text-decoration: none; overflow-wrap: anywhere; }
+.files li a:hover { background: var(--ink-800); color: var(--text); }
+.upload { position: relative; margin-top: 6px; padding: 8px; border: 1px dashed var(--line); border-radius: var(--radius); color: var(--text-faint); text-align: center; cursor: pointer; }
+.upload:hover, .upload:focus-within { color: var(--text); border-color: var(--text-faint); }
+.upload input { position: absolute; width: 1px; height: 1px; opacity: 0; }
 
 .preview { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .stage {

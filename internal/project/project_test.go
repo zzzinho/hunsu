@@ -71,13 +71,16 @@ func TestProject_List(t *testing.T) {
 	}{
 		{"편집 대상인 html 파일을 이름순으로 페이지에 나열한다",
 			[]string{"b.html", "a.html", "notes.txt"},
-			project.Listing{DesignSystem: noDesignSystem, Pages: []string{"a.html", "b.html"}}},
+			project.Listing{DesignSystem: noDesignSystem, Pages: []string{"a.html", "b.html"}, Assets: []string{}}},
 		{"심볼릭 링크는 페이지에 나열하지 않는다",
 			[]string{outsideLink},
-			project.Listing{DesignSystem: noDesignSystem, Pages: []string{}}},
+			project.Listing{DesignSystem: noDesignSystem, Pages: []string{}, Assets: []string{}}},
+		{"assets 폴더의 이미지·폰트를 이름순으로 에셋에 나열한다",
+			[]string{"assets/logo.png", "assets/Body.WOFF2", "assets/notes.txt", "assets/.hidden.png"},
+			project.Listing{DesignSystem: noDesignSystem, Pages: []string{}, Assets: []string{"assets/Body.WOFF2", "assets/logo.png"}}},
 		{"디자인 시스템 파일은 없어도 나열하고 존재 여부를 표시한다",
 			[]string{"design.css"},
-			project.Listing{DesignSystem: []project.Entry{{Path: "DESIGN.md"}, {Path: "design.css", Exists: true}}, Pages: []string{}}},
+			project.Listing{DesignSystem: []project.Entry{{Path: "DESIGN.md"}, {Path: "design.css", Exists: true}}, Pages: []string{}, Assets: []string{}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -156,6 +159,36 @@ func TestProject_Create(t *testing.T) {
 			got, _ := p.Read(tt.path)
 			if !errors.Is(err, tt.wantErr) || !strings.Contains(string(got), tt.wantContains) {
 				t.Errorf("Create(%q) error = %v, 내용 = %q; want %v, %q 포함", tt.path, err, got, tt.wantErr, tt.wantContains)
+			}
+		})
+	}
+}
+
+func TestProject_AddAsset(t *testing.T) {
+	tests := []struct {
+		name    string
+		file    string
+		size    int
+		wantErr error
+	}{
+		{"이미지를 assets 폴더에 올린다", "logo.png", 10, nil},
+		{"폰트를 assets 폴더에 올린다", "body.woff2", 10, nil},
+		{"확장자의 대소문자는 가리지 않는다", "photo.JPG", 10, nil},
+		{"10MB 까지 올린다", "big.png", project.MaxAssetSize, nil},
+		{"10MB 를 넘으면 올리지 않는다", "huge.png", project.MaxAssetSize + 1, project.ErrTooLarge},
+		{"이미지·폰트가 아니면 올리지 않는다", "script.js", 10, project.ErrNotAsset},
+		{"하위 폴더 경로로는 올리지 않는다", "../logo.png", 10, project.ErrNotAsset},
+		{"숨김 파일은 올리지 않는다", ".logo.png", 10, project.ErrNotAsset},
+		{"같은 이름이 있으면 덮어쓰지 않는다", "taken.png", 10, fs.ErrExist},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newProject(t, "assets/taken.png")
+			err := p.AddAsset(tt.file, strings.NewReader(strings.Repeat("x", tt.size)))
+			saved, _ := fs.ReadFile(p.FS(), "assets/"+tt.file)
+			uploaded := len(saved) == tt.size
+			if !errors.Is(err, tt.wantErr) || uploaded != (tt.wantErr == nil) {
+				t.Errorf("AddAsset(%q) error = %v, 올린 내용 저장 = %v; want %v", tt.file, err, uploaded, tt.wantErr)
 			}
 		})
 	}

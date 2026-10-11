@@ -9,6 +9,7 @@ A local, HTML-native design tool: edit pages by hand or have an LLM build and re
 - **Build and edit by talking**: create pages and a design system from an empty folder, then refine with "make this button bigger".
 - **Select elements**: click in the render view to say "this".
 - **Design system**: `DESIGN.md` (rules) and `design.css` (values), shared by every page and the LLM.
+- **Assets**: drop in images and fonts; the LLM uses them in pages.
 - **External agents (MCP)**: MCP clients such as Claude Code or Codex see your selection and edit files directly.
 - **Undo**: roll back a whole request in one step.
 
@@ -63,6 +64,10 @@ Click an element with the select tool (V); a selection chip appears above the in
 
 Both are pinned at the top of the file panel (click to create if missing) and sent to the LLM on the first request of a conversation and whenever they change.
 
+**Assets**
+
+Drop images (png, jpg, gif, webp, avif, svg) or fonts (woff, woff2, ttf, otf) anywhere on the screen, or pick them with Upload (이미지·폰트 올리기), to save them in `assets/`. Up to 10 MB per file; existing names are rejected. The list is sent to the LLM with every request. Assets are not part of undo; delete them in Finder.
+
 **Edit directly**: edit in the source editor and press ⌘S. Edits from other editors show up within 0.5 s and are reported to the LLM on the next request.
 
 ## External agents (MCP)
@@ -78,7 +83,7 @@ hunsu runs a standard MCP (Streamable HTTP) server. Agents read the browser stat
 
 | Tool | Behavior |
 |---|---|
-| `get_context` | Folder path, pages, design system, visible page, selected element |
+| `get_context` | Folder path, pages, assets, design system, visible page, selected element |
 | `checkpoint` | Save before editing; restorable with the browser's Undo |
 | `undo` | Restore the last checkpoint |
 | `open_page` | Open a page in the browser |
@@ -102,10 +107,11 @@ The token is created once at `~/Library/Application Support/hunsu/mcp-token` (06
 designs/
   DESIGN.md, design.css   # design system
   *.html                  # pages (root .html files only)
+  assets/                 # images and fonts
   .hunsu/                 # conversation ID, undo snapshots
 ```
 
-Pages keep CSS and JS inline and link only `design.css`.
+Pages keep CSS and JS inline and link only `design.css` and assets.
 
 ## LLM provider
 
@@ -122,7 +128,7 @@ go test ./... && node --test web/
 | Path | Responsibility |
 |---|---|
 | `main.go` | Composition: flags, provider choice, server start |
-| `internal/project` | Design folder access, blocking outside paths, templates, design rules |
+| `internal/project` | Design folder access, blocking outside paths, assets, templates, design rules |
 | `internal/watch` | File change detection |
 | `internal/llm` | Provider contract |
 | `internal/claude` | PoC provider (`claude -p`) |
@@ -137,7 +143,7 @@ No external dependencies. Coding rules: [`CLAUDE.md`](CLAUDE.md); decisions and 
 
 ## Limitations
 
-- localhost protection is partial (`/mcp` token, `/api/ui` origin check); the rest is the next milestone.
+- localhost protection is partial (`/mcp` token, `/api/ui` origin check); the rest comes before the v1 release.
 - Only one provider so far: the Claude Code CLI.
 - Pages an agent creates without `open_page` appear in the list on the next interaction.
 - Tested on macOS only. Only root `.html` files are pages.

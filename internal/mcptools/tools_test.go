@@ -67,12 +67,13 @@ func TestTools(t *testing.T) {
 		run  func(f *fixture) string
 		want string
 	}{
-		{"get_context 는 디자인 폴더, 페이지, 디자인 시스템, 보고 있는 페이지, 선택한 요소를 알려준다",
+		{"get_context 는 디자인 폴더, 페이지, 에셋, 디자인 시스템, 보고 있는 페이지, 선택한 요소를 알려준다",
 			func(f *fixture) string {
+				f.must(f.project.AddAsset("logo.png", strings.NewReader("png")))
 				f.hub.Update(ui.State{Page: "a.html", Selection: &ui.Selection{Selector: "h1", HTML: "<h1>안녕</h1>"}})
 				return strings.ReplaceAll(f.call("get_context", `{}`), f.dir, "<dir>")
 			},
-			`{"folder":"<dir>","pages":["a.html"],"designSystem":{"design.css":":root{}"},"currentPage":"a.html","selection":{"selector":"h1","html":"<h1>안녕</h1>"}}`},
+			`{"folder":"<dir>","pages":["a.html"],"assets":["assets/logo.png"],"designSystem":{"design.css":":root{}"},"currentPage":"a.html","selection":{"selector":"h1","html":"<h1>안녕</h1>"}}`},
 		{"아무것도 선택하지 않았으면 selection 은 null 이다",
 			func(f *fixture) string {
 				return fmt.Sprint(strings.Contains(f.call("get_context", `{}`), `"selection":null`))

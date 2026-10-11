@@ -2,7 +2,7 @@
 
 | 항목 | 내용 |
 |---|---|
-| 상태 | MVP(마일스톤 0~3) 구현 완료. v1(마일스톤 4~12) 계획 확정, 미구현 |
+| 상태 | MVP(마일스톤 0~3) 구현 완료. v1(마일스톤 4~12)은 `PLAN.md` 10 순서로 구현 중 |
 | 기준 | 결정·측정값의 기준은 `PLAN.md`. 이 문서는 그 결정의 이유와 트레이드오프를 모은다 |
 | 표기 | **(v1)** = 아직 구현하지 않은 계획. 표시 없음 = 구현됨. A1~A20 = 4절의 대안 |
 | 작성일 | 2026-10-11 |
@@ -95,7 +95,7 @@ hunsu (127.0.0.1:7777)
 
 | 결정 | 이유 | 감수하는 것 |
 |---|---|---|
-| 디자인 = 루트의 `.html` + `DESIGN.md`·`design.css`. 숨김 파일·심볼릭 링크 제외 | 브라우저가 그대로 렌더·적용한다. 변환 단계가 없다. 모든 페이지가 같은 경로로 `design.css` 를 링크한다 | 하위 폴더 페이지 없음. 페이지 CSS·JS 는 인라인 |
+| 디자인 = 루트의 `.html` + `DESIGN.md`·`design.css` + `assets/` 의 이미지·폰트. 숨김 파일·심볼릭 링크 제외 | 브라우저가 그대로 렌더·적용한다. 변환 단계가 없다. 모든 페이지가 같은 경로로 `design.css`·에셋을 링크한다 | 하위 폴더 페이지 없음. 페이지 CSS·JS 는 인라인 |
 | 변경 감지 = 0.5초 폴링. 열린 파일, 보이는 페이지, `design.css` 만 (A10) | LLM·에디터·외부 에디터 수정을 한 방법으로 잡는다. 의존성 없음 | 최대 0.5초 지연. 감시 대상이 늘면 비용도 는다 |
 | hunsu 의 저장 = 임시 파일에 쓰고 이름 바꾸기 | 렌더나 LLM 이 반쯤 쓴 파일을 읽지 않게 | 없음 |
 | 파일 API = 이름 규칙 + 일반 파일만 + `os.Root` (A11) | 폴더 밖 접근을 OS 수준에서 막는다 | 규칙 밖 파일은 다룰 수 없다 |
@@ -130,6 +130,7 @@ system (고정)   지시문(internal/chat/instructions.md) + 디자인 규칙(in
 user (요청마다) [현재 페이지] landing.html
                 [알림] 마지막 응답 이후 사용자가 직접 고친 파일: design.css …
                 [디자인 시스템] 첫 요청: 두 파일 전체 / 이후: 사용자가 바꾼 파일만
+                [에셋] assets/logo.png … (요청마다)
                 [선택한 요소] main > section.hero > button.cta + HTML(2000자)
                 [요청] 더 크게
 ```
@@ -199,7 +200,7 @@ type Provider interface {
 | 경로 | 역할 | 보호 (현재) |
 |---|---|---|
 | `GET /`, `GET /p/*` | UI, 디자인 폴더 정적 서빙(`no-store`) | 127.0.0.1 |
-| `/api/files`, `/api/file` | 목록, 읽기·쓰기·새 파일 | 127.0.0.1 + 파일 규칙 |
+| `/api/files`, `/api/file`, `POST /api/assets` | 목록, 읽기·쓰기·새 파일, 에셋 올리기 | 127.0.0.1 + 파일 규칙 |
 | `POST /api/chat` | 요청 실행, 진행 이벤트 SSE. 연결을 끊으면 취소 | 127.0.0.1 |
 | `/api/models`, `/api/undo`, `/api/chat/reset` | 모델 목록, 되돌리기, 새 대화 | 127.0.0.1 |
 | `GET /api/events` | 지정한 파일의 변경 알림 (SSE) | 127.0.0.1 |
@@ -214,7 +215,7 @@ type Provider interface {
 <디자인 폴더>/
   DESIGN.md, design.css     디자인 시스템
   *.html                    페이지 (루트만)
-  assets/                   (v1) 이미지·폰트. 유일한 하위 폴더
+  assets/                   이미지·폰트. 유일한 하위 폴더. 스냅샷에 넣지 않는다
   .hunsu/session            대화 ID (provider 가 준 값 그대로)
   .hunsu/history/000001/    요청·checkpoint 직전 스냅샷
 ~/Library/Application Support/hunsu/mcp-token   0600, 재사용
@@ -229,7 +230,7 @@ type Provider interface {
 |---|---|---|
 | 4. 보안·설치 | 나머지 API 에 Host·Origin 검사. `Provider.Status()`. universal 바이너리를 GitHub Release + Homebrew tap 으로 | server, llm 계약 |
 | 5. 영어 UI | 번역 모듈. LLM 은 사용자가 쓴 언어로 답한다. 프롬프트 라벨·터미널 출력은 영어 | web, chat 프롬프트 |
-| 6. 에셋 | `assets/` 에 끌어다 놓아 업로드(이미지·폰트, 크기 제한). 목록을 프롬프트와 `get_context` 에 | project, 디자인 규칙 |
+| 6. 에셋 (구현됨) | `assets/` 에 끌어다 놓아 업로드(이미지·폰트, 10MB). 목록을 프롬프트와 `get_context` 에 | project, 디자인 규칙 |
 | 7. 텍스트 직접 수정 | 렌더에서 더블클릭해 고친 문구를 원본에 반영 | web, 파일 API |
 | 8. 렌더러 | headless Chrome 스크린샷. `screenshot` 도구 공용. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 끈다 (A17) | 새 패키지, mcptools, provider |
 | 9. 내보내기 | 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용) | 새 패키지 |

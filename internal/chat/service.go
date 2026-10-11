@@ -76,7 +76,7 @@ func (s *Service) Send(ctx context.Context, t Turn, emit func(llm.Event)) error 
 	edited := s.editedSinceLastReply(current)
 	req := llm.Request{
 		Dir:          s.project.Dir(),
-		Prompt:       userPrompt(t, edited, designUpdate(current, edited, s.seen == nil)),
+		Prompt:       userPrompt(t, edited, designUpdate(current, edited, s.seen == nil), before.Assets),
 		SystemPrompt: systemPrompt(),
 		SessionID:    s.session.load(),
 		Model:        cmp.Or(t.Model, s.defaultModel()),

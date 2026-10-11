@@ -131,12 +131,14 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 [알림] 마지막 응답 이후 사용자가 직접 고친 파일: design.css. 고치기 전에 다시 읽어라.
 [디자인 시스템]
 <design.css>…</design.css>
+[에셋] assets/logo.png, assets/hero.jpg
 [선택한 요소] main > section.hero > button.cta
 <button class="cta">시작하기</button>
 [요청] 더 크게
 ```
 
 - `[알림]`: 응답 직후 파일 해시를 기억하고 달라진 파일을 알린다. 되돌리기도 포함. 없으면 예전 내용으로 Edit 하다 실패해 6초가 17초가 된다.
+- `[에셋]`: 올린 에셋이 있으면 요청마다 경로 목록을 붙인다.
 - 선택한 요소의 HTML 은 2000자까지.
 - **고정된 것은 앞, 바뀌는 것은 뒤.** 프롬프트 캐시는 앞부분이 같아야 재사용된다. system prompt 는 지시문(`internal/chat/instructions.md`)과 디자인 규칙(`internal/project/rules.md`)만 두고 바뀌지 않는다.
 - `[디자인 시스템]`: 대화의 첫 요청(새 대화·서버 재시작 포함)에 전체를, 이후에는 사용자가 바꾼 파일만 붙인다. LLM 이 고친 내용은 다시 보내지 않는다.
@@ -186,7 +188,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 **v1 기능** (먼저)
 
-- [ ] 6. 에셋: `assets/` 폴더(유일한 하위 폴더). 끌어다 놓아 업로드(이미지·폰트, 크기 제한). 목록을 프롬프트와 `get_context` 에. `rules.md` 의 "하위 폴더 금지, 이미지는 CSS·SVG" 수정. 되돌리기 스냅샷에 에셋 포함 여부 결정
+- [x] 6. 에셋: `assets/`(유일한 하위 폴더)에 이미지(png·jpg·gif·webp·avif·svg)·폰트(woff·woff2·ttf·otf)를 끌어다 놓거나 골라서 올린다. 파일당 10MB, 같은 이름은 거부. 목록을 요청마다 프롬프트 끝과 `get_context` 에. LLM 은 에셋을 참조만 하고 만들지 않으므로 되돌리기 스냅샷에 넣지 않는다. 지우기는 Finder 에서
 - [ ] 7. 텍스트 직접 수정: 렌더 화면에서 더블클릭해 문구를 고치면 원본에 반영
 - [ ] 8. 렌더러: headless Chrome 스크린샷. `screenshot` MCP 도구를 내장 provider 와 외부 에이전트가 함께 쓴다. 확인 시점은 LLM 이 판단(새 페이지·큰 변경 뒤). Chrome 이 없으면 기능을 끈다
 - [ ] 9. 내보내기: 폴더 ZIP, 페이지별 단일 HTML(CSS·에셋 포함), PNG(렌더러 사용)
