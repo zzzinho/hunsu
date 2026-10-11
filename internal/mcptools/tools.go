@@ -48,7 +48,7 @@ func New(p *project.Project, assistant *chat.Service, hub *ui.Hub, renderer Rend
 		},
 		{
 			Name:        "undo",
-			Description: "마지막 checkpoint 시점으로 디자인 파일을 되돌린다. 그 뒤에 생긴 페이지는 지운다.",
+			Description: "마지막 checkpoint 시점으로 디자인 파일을 되돌린다. 브라우저의 [되돌리기] 와 같은 기록을 쓰므로, 그 뒤에 브라우저 채팅 요청이나 버전 복원이 있었으면 그 직전으로 먼저 돌아간다. 그 뒤에 생긴 페이지는 지운다.",
 			InputSchema: noArgs,
 			Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
 				return mcp.Result{Text: "마지막 checkpoint 시점으로 되돌렸다"}, assistant.Undo()

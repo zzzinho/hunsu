@@ -38,7 +38,7 @@ type fixture struct {
 
 func newFixture(t *testing.T) *fixture {
 	p, dir := projecttest.New(t, map[string]string{"a.html": "a", "design.css": ":root{}"})
-	svc, err := chat.New(p, idleProvider{})
+	svc, err := chat.New(p, idleProvider{}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,7 +121,7 @@ func TestTools(t *testing.T) {
 			"error: none.html 은 페이지가 아니다. get_context 의 pages 중에서 고른다"},
 		{"Chrome 이 없으면 screenshot 도구를 내놓지 않는다",
 			func(f *fixture) string {
-				svc, err := chat.New(f.project, idleProvider{})
+				svc, err := chat.New(f.project, idleProvider{}, nil)
 				f.must(err)
 				var names []string
 				for _, tool := range mcptools.New(f.project, svc, f.hub, nil) {

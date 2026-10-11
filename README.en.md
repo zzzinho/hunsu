@@ -11,7 +11,7 @@ A local, HTML-native design tool: edit pages by hand or have an LLM build and re
 - **Design system**: `DESIGN.md` (rules) and `design.css` (values), shared by every page and the LLM.
 - **Assets**: drop in images and fonts; the LLM uses them in pages.
 - **External agents (MCP)**: MCP clients such as Claude Code or Codex see your selection and edit files directly.
-- **Undo**: roll back a whole request in one step.
+- **Undo and versions**: roll back a whole request in one step, or return to any thumbnailed version.
 - **Export**: folder ZIP, single-file HTML per page, PNG.
 
 The UI is currently Korean only; on-screen labels are given in parentheses.
@@ -44,6 +44,7 @@ The screen has a file panel, render view, and editor & chat panel. Drag borders 
 - Progress shows like "writing index.html · 12.4KB · 23s". While running, Send (보내기) becomes Cancel (취소).
 - The conversation continues per project. New chat (새 대화) starts over.
 - Undo (되돌리기) restores the state before the last request; repeat to go further back.
+- Versions (버전) lists the version saved after every request, with thumbnails. Restore any of them (Undo reverts a restore too), or save one yourself with Save current state (지금 상태 저장). The last 100 are kept.
 - Models come from the provider. The claude provider defaults to opus, with sonnet and haiku. A new page takes about 1 min 40 s with opus, about 30 s with haiku.
 
 **Select an element**
@@ -125,7 +126,7 @@ designs/
   DESIGN.md, design.css   # design system
   *.html                  # pages (root .html files only)
   assets/                 # images and fonts
-  .hunsu/                 # conversation ID, undo snapshots
+  .hunsu/                 # conversation ID, undo snapshots, versions
 ```
 
 Pages keep CSS and JS inline and link only `design.css` and assets.
@@ -169,4 +170,3 @@ No external dependencies. Coding rules: [`CLAUDE.md`](CLAUDE.md); decisions and 
 - Pages an agent creates without `open_page` appear in the list on the next interaction.
 - Tested on macOS only. Only root `.html` files are pages.
 - Classes or ids added by page JavaScript at runtime may end up in the selection path, so an LLM edit may not apply.
-- Undo snapshots are never cleaned up.

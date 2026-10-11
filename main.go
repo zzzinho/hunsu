@@ -2,6 +2,7 @@ package main
 
 import (
 	"cmp"
+	"context"
 	"embed"
 	"flag"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 
 	"hunsu/internal/chat"
 	"hunsu/internal/claude"
+	"hunsu/internal/history"
 	"hunsu/internal/llm"
 	"hunsu/internal/mcp"
 	"hunsu/internal/mcptools"
@@ -64,7 +66,7 @@ func run(dir string, port int, openBrowser bool) error {
 	if renderer != nil {
 		tools = &llm.MCPServer{Name: "hunsu", URL: url + "mcp/render", Token: token}
 	}
-	assistant, err := chat.New(p, provider(tools))
+	assistant, err := chat.New(p, provider(tools), thumbnailer(renderer))
 	if err != nil {
 		return err
 	}
@@ -93,6 +95,18 @@ func run(dir string, port int, openBrowser bool) error {
 // 다른 LLM 은 llm.Provider 를 구현한 뒤 여기서 바꾼다.
 func provider(tools *llm.MCPServer) llm.Provider {
 	return claude.CLI{Path: "claude", Tools: tools}
+}
+
+// 버전 썸네일은 첫 화면만 찍는다. Chrome 이 없으면 썸네일 없이 버전을 남긴다.
+func thumbnailer(renderer mcptools.Renderer) history.Thumbnailer {
+	if renderer == nil {
+		return nil
+	}
+	return func(page string) ([]byte, error) {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+		return renderer.Screenshot(ctx, page, 1280, 800)
+	}
 }
 
 // Chrome 이 없으면 nil 이다. 렌더 결과 확인 기능만 꺼지고 나머지는 그대로 동작한다.
