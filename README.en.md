@@ -43,7 +43,7 @@ To update, run `git pull` in the cloned folder, then build and move it again.
 hunsu ~/designs      # defaults to the current directory
 ```
 
-Serves at `http://127.0.0.1:7777` and opens your browser. `-port 8888` changes the port, `-no-open` skips the browser. `-provider codex` picks the LLM (by default the first installed of claude, codex). If it is not installed or logged in, the terminal and the chat tell you which command to run.
+Serves at the folder's own port and opens your browser. The first folder you open gets `http://127.0.0.1:7777`, the next ones 7778, 7779…, and each folder keeps its port across runs (`~/Library/Application Support/hunsu/ports.json`). You can run several folders at once; running a folder that is already open opens its page. `-port 8888` uses another port for that run only, `-no-open` skips the browser. `-provider codex` picks the LLM (by default the first installed of claude, codex). If it is not installed or logged in, the terminal and the chat tell you which command to run.
 
 ## Usage
 
@@ -105,11 +105,13 @@ Download from Export in the toolbar.
 
 hunsu runs a standard MCP (Streamable HTTP) server. Agents read the browser state and edit files directly; hunsu redraws immediately.
 
-1. On startup hunsu prints the MCP URL and token: `http://127.0.0.1:7777/mcp`, `Authorization: Bearer <token>`
-2. Register it once in your MCP client. For Claude Code:
+1. On startup hunsu prints the folder's MCP URL and token: `http://127.0.0.1:<folder port>/mcp`, `Authorization: Bearer <token>`. All folders share the token.
+2. Register it once per folder in your MCP client. In Claude Code, registering from the design folder scopes it to that folder:
    ```bash
-   claude mcp add --transport http -s user hunsu http://127.0.0.1:7777/mcp -H "Authorization: Bearer <token>"
+   cd ~/designs
+   claude mcp add --transport http hunsu http://127.0.0.1:7777/mcp -H "Authorization: Bearer <token>"
    ```
+   If you registered it earlier with `-s user`, remove that: `claude mcp remove -s user hunsu`. For clients without per-folder registration, register each folder under its own name (such as `hunsu-landing`).
 3. Ask your agent from the design folder: "change the element I selected in hunsu to red, then make an about page and open it"
 
 | Tool | Behavior |
