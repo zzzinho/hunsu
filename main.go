@@ -31,7 +31,7 @@ import (
 	"hunsu/internal/ui"
 )
 
-// 클론한 폴더에서 go build 하면 Go 가 git 커밋으로 만든 버전(고친 채면 +dirty)을 넣는다.
+// 클론한 폴더에서 go build 하면 Go 가 git 태그·커밋으로 만든 버전(고친 채면 +dirty)을 넣는다.
 func version() string {
 	if info, ok := debug.ReadBuildInfo(); ok {
 		return info.Main.Version
