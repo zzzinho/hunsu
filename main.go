@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"embed"
+	"errors"
 	"flag"
 	"fmt"
 	"io/fs"
@@ -63,6 +64,18 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 		return err
 	}
 	defer p.Close()
+	claim, running, err := p.Claim()
+	if errors.Is(err, project.ErrRunning) {
+		fmt.Printf("hunsu: already running for %s at %s\n", p.Dir(), running)
+		if openBrowser && running != "" {
+			exec.Command("open", running).Start()
+		}
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	defer claim.Close()
 	web, err := fs.Sub(webFiles, "web")
 	if err != nil {
 		return err
@@ -76,6 +89,9 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 		return fmt.Errorf("%w (choose another port with -port)", err)
 	}
 	url := "http://" + ln.Addr().String() + "/"
+	if err := claim.Announce(url); err != nil {
+		return err
+	}
 	renderer := findRenderer(url + "p/")
 	var tools *llm.MCPServer
 	if renderer != nil {
