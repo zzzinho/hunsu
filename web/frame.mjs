@@ -23,6 +23,7 @@ export function createFrameTools(frame, { onPick, onKey, onZoom, onEditText, can
   let pan = null;
   let suppressClick = false;
   let editing = null;
+  let reloadAfterEdit = false;
 
   const doc = () => frame.contentDocument;
   const win = () => frame.contentWindow;
@@ -105,8 +106,18 @@ export function createFrameTools(frame, { onPick, onKey, onZoom, onEditText, can
     element.removeAttribute('contenteditable');
     delete element.dataset.hunsuEditing;
     const value = element.textContent;
+    const changed = commit && value.trim() !== text.trim();
     if (!commit) element.textContent = text;
-    else if (value.trim() !== text.trim()) onEditText({ text, occurrence, value });
+    else if (changed) onEditText({ text, occurrence, value });
+    // 반영한 문구는 저장되면서 파일 변경으로 다시 새로고침된다.
+    if (reloadAfterEdit && !changed) win().location.reload();
+    reloadAfterEdit = false;
+  }
+
+  // 문구를 고치는 동안 외부 에이전트가 파일을 바꿔도 고치던 문구를 날리지 않게 끝날 때까지 미룬다.
+  function reload() {
+    if (editing) reloadAfterEdit = true;
+    else win()?.location.reload();
   }
 
   function endPan() {
@@ -170,6 +181,7 @@ export function createFrameTools(frame, { onPick, onKey, onZoom, onEditText, can
   function attach() {
     const d = doc();
     editing = null;
+    reloadAfterEdit = false;
     if (!d?.documentElement) return;
     const style = d.createElement('style');
     style.id = 'hunsu-style';
@@ -216,5 +228,6 @@ export function createFrameTools(frame, { onPick, onKey, onZoom, onEditText, can
       applyTool();
     },
     clear,
+    reload,
   };
 }

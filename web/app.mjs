@@ -332,7 +332,7 @@ function watch() {
   events.onopen = reportUI;
   events.addEventListener('change', ({ data: changed }) => {
     const reaction = reactionTo(changed, state, !editor.isClean());
-    if (reaction.preview && state.preview) frame.contentWindow.location.reload();
+    if (reaction.preview && state.preview) frameTools.reload();
     if (reaction.editor) reloadEditor(changed).catch(() => {});
     if (reaction.conflict) checkConflict(changed).catch(() => {});
   });
