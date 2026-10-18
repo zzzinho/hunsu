@@ -38,7 +38,7 @@ hunsu 는 HTML 로 디자인하는 로컬 도구다. "HTML 을 쓰는 Figma". �
 | 모든 페이지와 LLM 이 디자인 시스템(`DESIGN.md` + `design.css`)을 공유한다 | 구현 |
 | 대화가 이어지고, 요청 하나를 통째로 되돌린다 | 구현 |
 | 특정 LLM 에 묶이지 않는다: provider 교체, MCP 클라이언트 중립 | 구현 (claude, codex) |
-| 다른 사람이 설치해서 혼자 디자인을 만들고 전달한다: Homebrew 설치, provider 로그인 확인, 에셋, 내보내기, 버전 | 구현 (Homebrew tap 은 저장소 준비 후) |
+| 다른 사람이 설치해서 혼자 디자인을 만들고 전달한다: 소스 빌드 설치, provider 로그인 확인, 에셋, 내보내기, 버전 | 구현 |
 | LLM 이 렌더 결과를 본다. 비교안, 텍스트 직접 수정, 영어 UI, Codex provider | 구현 |
 
 **Non-goals**
@@ -240,7 +240,7 @@ type Provider interface {
 
 | 마일스톤 | 설계 | 바뀌는 경계 |
 |---|---|---|
-| 4. 보안·설치 (구현됨) | 나머지 API 에 Host·Origin 검사. `Provider.Status()`. universal 바이너리를 GitHub Release + Homebrew tap 으로 | server, llm 계약, `.github/workflows/release.yml` |
+| 4. 보안·설치 (구현됨) | 나머지 API 에 Host·Origin 검사. `Provider.Status()`. 설치는 클론 후 소스 빌드 | server, llm 계약, README |
 | 5. 영어 UI (구현됨) | 번역 모듈. LLM 은 사용자가 쓴 언어로 답한다. 프롬프트 라벨·터미널 출력은 영어 | web, chat 프롬프트, server 오류, llm.Model, history.Note |
 | 6. 에셋 (구현됨) | `assets/` 에 끌어다 놓아 업로드(이미지·폰트, 10MB). 목록을 프롬프트와 `get_context` 에 | project, 디자인 규칙 |
 | 7. 텍스트 직접 수정 (구현됨) | 렌더에서 더블클릭해 고친 문구를 원본에 반영. 같은 문구 중 몇 번째인지로 원본 위치를 찾는다 | web |
@@ -259,7 +259,7 @@ type Provider interface {
 | A1 | 실행 형태 | CLI `./hunsu [폴더]` | `.app` | Finder 로 실행하면 셸 PATH 를 물려받지 못해 provider CLI 를 못 찾는다 |
 | A2 | 런타임 | Go (약 10MB) | `bun --compile` | 60MB 이상. Go 는 embed·HTTP·프로세스 실행이 표준 라이브러리 |
 | A3 | 에디터 | CodeMirror 5 파일 포함 | CodeMirror 6 / textarea | CM6 은 번들러가 필요하다(빌드 단계 없음 원칙과 충돌). textarea 는 구문 강조·줄 번호·들여쓰기가 없다 |
-| A16 | 배포 | GitHub Release + Homebrew tap, 서명 없음 | 서명·공증 다운로드 / `go install` / 파일 전달 | 서명·공증은 Apple 개발자 등록이 필요하다. `go install` 은 Go 툴체인이 필요하다. 파일 전달은 받은 사람이 `xattr` 로 격리 속성을 지워야 한다. brew 설치는 Gatekeeper 에 막히지 않는다 |
+| A16 | 배포 | GitHub 에서 클론해 소스 빌드 | Homebrew tap / 서명·공증 다운로드 / Release 바이너리 | tap 은 별도 저장소·토큰·태그 관리가 든다. 서명·공증은 Apple 개발자 등록이 필요하다. 브라우저로 받은 서명 없는 바이너리는 `xattr` 로 격리 속성을 지워야 한다. 직접 빌드한 바이너리는 격리 속성이 없고, 사용자는 이미 provider CLI 를 써서 Go 설치 부담이 작다 |
 
 **LLM 연동**
 

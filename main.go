@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 
@@ -28,8 +29,13 @@ import (
 	"hunsu/internal/ui"
 )
 
-// 배포 빌드가 -ldflags "-X main.version=..." 로 태그 버전을 넣는다.
-var version = "dev"
+// 클론한 폴더에서 go build 하면 Go 가 git 커밋으로 만든 버전(고친 채면 +dirty)을 넣는다.
+func version() string {
+	if info, ok := debug.ReadBuildInfo(); ok {
+		return info.Main.Version
+	}
+	return "dev"
+}
 
 //go:embed web
 var webFiles embed.FS
@@ -42,7 +48,7 @@ func main() {
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
 	if *showVersion {
-		fmt.Println("hunsu", version)
+		fmt.Println("hunsu", version())
 		return
 	}
 	if err := run(cmp.Or(flag.Arg(0), "."), *port, !*noOpen, *providerName); err != nil {
@@ -85,7 +91,7 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 	}
 	hub := ui.NewHub()
 
-	info := mcp.Info{Name: "hunsu", Version: version}
+	info := mcp.Info{Name: "hunsu", Version: version()}
 	mux := http.NewServeMux()
 	mux.Handle("/mcp", mcp.RequireToken(token, mcp.NewServer(info, mcptools.Instructions(), mcptools.New(p, assistant, hub, renderer)...)))
 	if renderer != nil {

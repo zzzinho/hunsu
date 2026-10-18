@@ -42,7 +42,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 원본을 직접 고치거나 
 | 모델 | provider 가 목록과 기본값(첫 번째)을 정한다. 화면은 `/api/models` | claude provider: opus(기본)·sonnet·haiku. haiku 는 2배 빠르고 20배 싸다 (11) |
 | 캔버스 | 파일 1개 미리보기 + 모바일/데스크톱 너비 | 다중 프레임은 MVP 핵심과 무관 |
 | 외부 에이전트 | MCP 서버 `/mcp` | 클라이언트(Claude Code, Codex 등)에 묶이지 않는 표준 (7) |
-| 배포 (v1) | GitHub Release + Homebrew tap. 서명 없음 | brew 설치는 Gatekeeper 에 막히지 않는다. Apple 개발자 등록 불필요 |
+| 배포 (v1) | GitHub 에서 클론해 소스로 빌드. 바이너리 배포 없음 | tap·토큰·태그를 관리하지 않는다. 직접 빌드한 바이너리는 Gatekeeper 격리 속성이 없다. 사용자는 이미 provider CLI 를 써서 Go 설치 부담이 작다 |
 | provider 연결 (v1) | 각 CLI 의 로그인을 쓴다. hunsu 는 키를 갖지 않는다 | `claude auth status --json`, `codex login status` 로 확인하고 로그인 명령을 안내 |
 | UI 언어 (v1) | 영어 기본, 설정에서 한국어 | v1 은 다른 사람이 쓴다 |
 | 버저닝 (v1) | 내장 타임라인 (git 미사용) | 의존성 없음. 디자이너도 쓸 수 있다 |
@@ -211,7 +211,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 **v1 마무리** (기능 뒤)
 
 - [x] 5. 영어 UI: 화면 문구는 `web/i18n.mjs` 사전(영어 기본, 한국어). 파일 패널 위 언어 선택으로 고르고 브라우저에 기억한다. 서버의 오류·터미널 출력·프롬프트 라벨·지시문·MCP 설명은 영어. 화면에 보이는 서버 오류는 `{"code","message"}` 로 받아 화면이 코드로 번역한다. LLM 은 사용자가 쓴 언어로 답한다. 모델은 provider 가 이름과 빠름 여부(`Model.Fast`)만 알리고 문구는 화면이 붙인다. 버전 이름은 종류(`kind`)·요청 내용·번호로 남기고 화면이 문구로 바꾼다
-- [x] 4. 보안·설치: 모든 요청에 Host 검사(호스트 이름이 127.0.0.1·localhost 가 아니면 거부, DNS rebinding)와 Origin 검사(있는데 자기 출처가 아니면 거부, CSRF. 없으면 브라우저가 아닌 로컬 프로그램으로 보고 받는다). `/p/*`·`/variant/*` 는 디자인 파일(페이지·디자인 시스템·에셋)만 주고 `.hunsu/`·디렉터리 목록은 주지 않는다. provider 계약에 `Status()`(설치·로그인, 고칠 명령), 화면과 터미널에 알린다. MCP `initialize` 는 아는 버전이면 그대로, 모르면 최신 버전으로 답한다. 배포는 태그를 push 하면 GitHub Actions 가 universal 바이너리를 Release 에 올리고 Homebrew tap(`zzzinho/homebrew-hunsu`) formula 를 갱신한다. tap 저장소와 토큰 준비는 사용자가 한다
+- [x] 4. 보안·설치: 모든 요청에 Host 검사(호스트 이름이 127.0.0.1·localhost 가 아니면 거부, DNS rebinding)와 Origin 검사(있는데 자기 출처가 아니면 거부, CSRF. 없으면 브라우저가 아닌 로컬 프로그램으로 보고 받는다). `/p/*`·`/variant/*` 는 디자인 파일(페이지·디자인 시스템·에셋)만 주고 `.hunsu/`·디렉터리 목록은 주지 않는다. provider 계약에 `Status()`(설치·로그인, 고칠 명령), 화면과 터미널에 알린다. MCP `initialize` 는 아는 버전이면 그대로, 모르면 최신 버전으로 답한다. 배포는 GitHub 에서 클론해 소스로 빌드한다 (3). `-version` 은 Go 가 git 커밋으로 넣은 버전을 보인다
 
 **v1 이후**
 

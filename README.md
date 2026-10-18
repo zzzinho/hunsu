@@ -20,15 +20,20 @@ HTML 로 디자인하는 로컬 디자인 도구. 렌더 화면을 보며 원본
 - macOS
 - 브라우저 채팅의 LLM: [Claude Code](https://claude.com/claude-code) CLI(`claude`) 또는 [Codex](https://github.com/openai/codex) CLI(`codex`), 로그인 상태
 - Chrome (선택): LLM 이 렌더 결과를 보고 확인한다. Chromium·Edge·Brave 도 된다. 없으면 이 기능만 꺼진다
-- Go 1.27+: 소스로 빌드할 때만
+- Go 1.27+: 빌드에 쓴다 (`brew install go`)
 
 ## 설치
 
+GitHub 에서 받아 빌드한다.
+
 ```bash
-brew install zzzinho/hunsu/hunsu
+git clone https://github.com/zzzinho/hunsu.git
+cd hunsu
+go build -o hunsu .
+sudo mv hunsu /usr/local/bin/   # 어디서나 hunsu 로 실행하려면
 ```
 
-소스로 빌드하려면 Go 1.27+ 로 `go build -o hunsu .`.
+업데이트는 클론한 폴더에서 `git pull` 후 다시 빌드해 옮긴다.
 
 ## 실행
 
@@ -158,8 +163,6 @@ Chrome 이 있으면 provider 에게 `screenshot` 도구만 둔 MCP 서버(`/mcp
 ```bash
 go test ./... && node --test web/
 ```
-
-릴리스: `v*` 태그를 push 하면 GitHub Actions 가 universal 바이너리를 Release 에 올린다. `HOMEBREW_TAP_TOKEN` 비밀값이 있으면 `<owner>/homebrew-hunsu` 의 formula 도 갱신한다.
 
 | 경로 | 책임 |
 |---|---|
