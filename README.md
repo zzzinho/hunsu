@@ -41,7 +41,7 @@ sudo mv hunsu /usr/local/bin/   # 어디서나 hunsu 로 실행하려면
 hunsu ~/designs      # 생략하면 현재 디렉터리
 ```
 
-`http://127.0.0.1:7777` 에 뜨고 브라우저가 열린다. `-port 8888` 로 포트 변경, `-no-open` 으로 브라우저 열기 생략. `-provider codex` 로 LLM 을 고른다(생략하면 설치된 것을 claude → codex 순으로). 설치·로그인이 안 됐으면 터미널과 채팅 창에 실행할 명령을 알린다.
+폴더마다 정해진 포트에 뜨고 브라우저가 열린다. 처음 연 폴더는 `http://127.0.0.1:7777`, 다음 폴더부터 7778, 7779… 를 쓰고, 다시 실행해도 같은 포트를 쓴다(`~/Library/Application Support/hunsu/ports.json`). 여러 폴더를 동시에 띄울 수 있고, 이미 떠 있는 폴더를 다시 실행하면 그 화면을 연다. `-port 8888` 은 그 실행에만 다른 포트를 쓴다, `-no-open` 으로 브라우저 열기 생략. `-provider codex` 로 LLM 을 고른다(생략하면 설치된 것을 claude → codex 순으로). 설치·로그인이 안 됐으면 터미널과 채팅 창에 실행할 명령을 알린다.
 
 ## 사용법
 
@@ -103,11 +103,13 @@ hunsu ~/designs      # 생략하면 현재 디렉터리
 
 hunsu 는 표준 MCP(Streamable HTTP) 서버를 연다. 에이전트가 브라우저 상태를 읽고 파일을 직접 고치면, hunsu 가 바로 다시 그린다.
 
-1. 실행하면 MCP 주소와 토큰이 출력된다: `http://127.0.0.1:7777/mcp`, `Authorization: Bearer <토큰>`
-2. MCP 클라이언트에 한 번 등록한다. Claude Code 예:
+1. 실행하면 그 폴더의 MCP 주소와 토큰이 출력된다: `http://127.0.0.1:<폴더 포트>/mcp`, `Authorization: Bearer <토큰>`. 토큰은 모든 폴더가 같다.
+2. MCP 클라이언트에 폴더마다 한 번 등록한다. Claude Code 는 디자인 폴더에서 등록하면 그 폴더에서만 쓰인다:
    ```bash
-   claude mcp add --transport http -s user hunsu http://127.0.0.1:7777/mcp -H "Authorization: Bearer <토큰>"
+   cd ~/designs
+   claude mcp add --transport http hunsu http://127.0.0.1:7777/mcp -H "Authorization: Bearer <토큰>"
    ```
+   예전에 `-s user` 로 등록했다면 지운다: `claude mcp remove -s user hunsu`. 폴더별 등록을 지원하지 않는 클라이언트에는 폴더마다 이름을 달리해(`hunsu-landing` 등) 등록한다.
 3. 디자인 폴더에서 에이전트에게 요청한다: "hunsu 에서 선택한 요소를 빨간색으로 바꾸고, about 페이지를 만들어 열어줘"
 
 | 도구 | 동작 |
