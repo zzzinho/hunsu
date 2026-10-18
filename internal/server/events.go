@@ -3,15 +3,17 @@ package server
 import (
 	"encoding/json"
 	"net/http"
+	"reflect"
 	"time"
 
 	"hunsu/internal/watch"
 )
 
-// 탭 하나가 연결 하나만 쓰도록 파일 변경(change)과 화면 명령(command)을 한 스트림으로 보낸다.
+// 탭 하나가 연결 하나만 쓰도록 파일 변경(change), 파일 목록 변경(list), 화면 명령(command)을 한 스트림으로 보낸다.
 // 브라우저는 한 호스트에 HTTP/1.1 연결을 6개까지만 연다.
 func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 	poller := watch.NewPoller(s.project.FS(), r.URL.Query()["path"])
+	listing, _ := s.project.List()
 	commands, cancel := s.hub.Subscribe()
 	defer cancel()
 	stream, err := startEvents(w)
@@ -32,6 +34,13 @@ func (s *Server) events(w http.ResponseWriter, r *http.Request) {
 		case <-ticker.C:
 			for _, name := range poller.Poll() {
 				if stream.send("change", name) != nil {
+					return
+				}
+			}
+			// 외부 에이전트가 open_page 없이 만든 페이지도 목록에 나오게 한다. 데이터가 빈 이벤트는 브라우저가 버린다.
+			if now, err := s.project.List(); err == nil && !reflect.DeepEqual(now, listing) {
+				listing = now
+				if stream.send("list", "files") != nil {
 					return
 				}
 			}

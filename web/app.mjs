@@ -298,6 +298,7 @@ function watch() {
     if (reaction.preview && state.preview) frame.contentWindow.location.reload();
     if (reaction.editor) reloadEditor(changed).catch(() => {});
   });
+  events.addEventListener('list', () => openExisting().catch(() => {}));
   events.addEventListener('command', ({ data }) => {
     const command = JSON.parse(data);
     if (command.kind === 'open') open(command.page);
