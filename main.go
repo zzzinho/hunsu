@@ -24,6 +24,7 @@ import (
 	"hunsu/internal/llm"
 	"hunsu/internal/mcp"
 	"hunsu/internal/mcptools"
+	"hunsu/internal/ports"
 	"hunsu/internal/project"
 	"hunsu/internal/render"
 	"hunsu/internal/server"
@@ -43,8 +44,7 @@ var webFiles embed.FS
 
 func main() {
 	noOpen := flag.Bool("no-open", false, "do not open the browser")
-	// MCP 클라이언트에 등록한 주소가 실행할 때마다 바뀌지 않도록 포트를 고정한다.
-	port := flag.Int("port", 7777, "server port")
+	port := flag.Int("port", 0, "server port for this run (default: the folder's own port, starting at 7777)")
 	providerName := flag.String("provider", "", "LLM for the browser chat: claude or codex. Defaults to the first installed of claude, codex")
 	showVersion := flag.Bool("version", false, "print the version and exit")
 	flag.Parse()
@@ -84,7 +84,7 @@ func run(dir string, port int, openBrowser bool, providerName string) error {
 	if err != nil {
 		return err
 	}
-	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	ln, err := listen(p.Dir(), port)
 	if err != nil {
 		return fmt.Errorf("%w (choose another port with -port)", err)
 	}
@@ -181,10 +181,27 @@ func findRenderer(base string) mcptools.Renderer {
 	return render.Chrome{Path: path, Base: base}
 }
 
+// port 가 0 이면 폴더에 정해 둔 포트를 쓴다. -port 로 준 포트는 그 실행에만 쓰고 기억하지 않는다.
+func listen(dir string, port int) (net.Listener, error) {
+	if port != 0 {
+		return net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	}
+	registry, err := configPath("ports.json")
+	if err != nil {
+		return nil, err
+	}
+	return ports.Listen(registry, dir, ports.First)
+}
+
 func mcpToken() (string, error) {
-	configDir, err := os.UserConfigDir()
+	path, err := configPath("mcp-token")
 	if err != nil {
 		return "", err
 	}
-	return mcp.LoadToken(filepath.Join(configDir, "hunsu", "mcp-token"))
+	return mcp.LoadToken(path)
+}
+
+func configPath(name string) (string, error) {
+	configDir, err := os.UserConfigDir()
+	return filepath.Join(configDir, "hunsu", name), err
 }
