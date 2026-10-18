@@ -22,15 +22,20 @@ The UI is in English by default; switch to Korean from the language menu above t
 - macOS
 - LLM for the browser chat: [Claude Code](https://claude.com/claude-code) CLI (`claude`) or [Codex](https://github.com/openai/codex) CLI (`codex`), logged in
 - Chrome (optional): lets the LLM look at the rendered result. Chromium, Edge and Brave work too; without one, only this feature is off
-- Go 1.27+: only to build from source
+- Go 1.27+: to build (`brew install go`)
 
 ## Install
 
+Clone and build from GitHub.
+
 ```bash
-brew install zzzinho/hunsu/hunsu
+git clone https://github.com/zzzinho/hunsu.git
+cd hunsu
+go build -o hunsu .
+sudo mv hunsu /usr/local/bin/   # to run hunsu from anywhere
 ```
 
-To build from source, run `go build -o hunsu .` with Go 1.27+.
+To update, run `git pull` in the cloned folder, then build and move it again.
 
 ## Run
 
@@ -160,8 +165,6 @@ Measurements: [`PLAN.md`](PLAN.md) section 11.
 ```bash
 go test ./... && node --test web/
 ```
-
-Release: pushing a `v*` tag makes GitHub Actions upload a universal binary to the release. With a `HOMEBREW_TAP_TOKEN` secret it also updates the formula in `<owner>/homebrew-hunsu`.
 
 | Path | Responsibility |
 |---|---|
