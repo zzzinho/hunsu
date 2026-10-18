@@ -15,6 +15,19 @@ node --test web/
 - main 에서 직접 작업하지 않는다. 작업마다 main 에서 브랜치를 만든다: `feat/…`, `fix/…`, `docs/…`.
 - 모든 커밋은 그 자체로 동작한다. 빌드와 위 테스트가 모두 통과할 때만 커밋하고, 깨진 중간 상태는 커밋하지 않는다.
 
+## 버전
+
+Semantic Versioning 을 따른다. main 에 병합하면 병합 커밋에 annotated 태그 `vMAJOR.MINOR.PATCH` 를 단다. 메시지는 그 병합의 요약 한 줄이다. `hunsu -version` 은 Go 가 이 태그로 넣은 값을 보인다.
+
+사용자가 맞닿는 면을 기준으로 올린다: 실행 인자, MCP 도구 이름·인자, 디자인 폴더와 `.hunsu/` 형식, 사용자 설정 폴더의 파일, MCP 등록 주소.
+
+- MAJOR: 그 면이 바뀌어 기존 폴더·설정·등록이 그대로 동작하지 않는다.
+- MINOR: 기능을 더했다. 기존 것은 그대로 동작한다.
+- PATCH: 결함을 고쳤거나 동작 약속은 그대로인 개선이다.
+- 문서만 바꾼 병합에는 달지 않는다.
+
+태그는 main 을 push 할 때 함께 올린다: `git push --follow-tags origin main`.
+
 ## 설계
 
 **SRP**
