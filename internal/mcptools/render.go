@@ -32,19 +32,20 @@ var shotArgs = map[string]any{
 	"required": []string{"page"},
 }
 
+var screenshotSpec = mcp.Tool{
+	Name:        "screenshot",
+	Description: "Returns an image of the design page rendered in a browser (top 4000 px at most). Use it to check the result after creating a page or substantially changing a layout. Do not use it for small edits.",
+	InputSchema: shotArgs,
+}
+
 // Render 는 화면 확인 도구다. 외부 에이전트와 브라우저 채팅의 provider 가 함께 쓴다. renderer 가 nil(Chrome 없음)이면 비어 있다.
 func Render(p *project.Project, renderer Renderer) []mcp.Tool {
 	if renderer == nil {
 		return nil
 	}
-	return []mcp.Tool{{
-		Name:        "screenshot",
-		Description: "Returns an image of the design page rendered in a browser (top 4000 px at most). Use it to check the result after creating a page or substantially changing a layout. Do not use it for small edits.",
-		InputSchema: shotArgs,
-		Call: func(ctx context.Context, args json.RawMessage) (mcp.Result, error) {
-			return screenshot(ctx, p, renderer, args)
-		},
-	}}
+	return []mcp.Tool{with(screenshotSpec, func(ctx context.Context, args json.RawMessage) (mcp.Result, error) {
+		return screenshot(ctx, p, renderer, args)
+	})}
 }
 
 func screenshot(ctx context.Context, p *project.Project, renderer Renderer, args json.RawMessage) (mcp.Result, error) {

@@ -30,38 +30,56 @@ var errNoBrowser = errors.New("no browser is connected. Ask the user to open hun
 
 func Instructions() string { return guide + project.Rules }
 
+var (
+	getContextSpec = mcp.Tool{
+		Name:        "get_context",
+		Description: "Tells you what the user sees in hunsu: the design folder's absolute path, pages, uploaded asset (image and font) paths, design system contents (DESIGN.md, design.css), the page visible in the browser, and the element selected in the browser (CSS selector and HTML). Call it when you start design work and when the user says \"this\" or \"the selected one\".",
+		InputSchema: noArgs,
+	}
+	checkpointSpec = mcp.Tool{
+		Name:        "checkpoint",
+		Description: "Saves the current state before you edit design files. The user can return to it with Undo in the browser or the undo tool. Call it once per request, before you start editing files.",
+		InputSchema: noArgs,
+	}
+	undoSpec = mcp.Tool{
+		Name:        "undo",
+		Description: "Restores design files to the last checkpoint. It shares history with Undo in the browser, so if a browser chat request or a version restore happened after the checkpoint, it goes back to just before that first. Pages created since are removed.",
+		InputSchema: noArgs,
+	}
+	openPageSpec = mcp.Tool{
+		Name:        "open_page",
+		Description: "Opens a page in hunsu in the browser. Call it after creating a page or editing one that is not visible.",
+		InputSchema: pageArg,
+	}
+)
+
+// Specs 는 도구의 이름·설명·인자다. 중계(hunsu mcp)가 hunsu 를 띄우기 전에 이 목록을 알린다.
+// screenshot 은 Chrome 이 있을 때만 있다.
+func Specs(screenshot bool) []mcp.Tool {
+	specs := []mcp.Tool{getContextSpec, checkpointSpec, undoSpec, openPageSpec}
+	if screenshot {
+		specs = append(specs, screenshotSpec)
+	}
+	return specs
+}
+
 func New(p *project.Project, assistant *chat.Service, hub *ui.Hub, renderer Renderer) []mcp.Tool {
 	tools := []mcp.Tool{
-		{
-			Name:        "get_context",
-			Description: "Tells you what the user sees in hunsu: the design folder's absolute path, pages, uploaded asset (image and font) paths, design system contents (DESIGN.md, design.css), the page visible in the browser, and the element selected in the browser (CSS selector and HTML). Call it when you start design work and when the user says \"this\" or \"the selected one\".",
-			InputSchema: noArgs,
-			Call:        func(context.Context, json.RawMessage) (mcp.Result, error) { return text(workspaceOf(p, hub)) },
-		},
-		{
-			Name:        "checkpoint",
-			Description: "Saves the current state before you edit design files. The user can return to it with Undo in the browser or the undo tool. Call it once per request, before you start editing files.",
-			InputSchema: noArgs,
-			Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
-				return mcp.Result{Text: "saved a point to undo to"}, assistant.Checkpoint()
-			},
-		},
-		{
-			Name:        "undo",
-			Description: "Restores design files to the last checkpoint. It shares history with Undo in the browser, so if a browser chat request or a version restore happened after the checkpoint, it goes back to just before that first. Pages created since are removed.",
-			InputSchema: noArgs,
-			Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
-				return mcp.Result{Text: "restored the last checkpoint"}, assistant.Undo(hub.Current().Page)
-			},
-		},
-		{
-			Name:        "open_page",
-			Description: "Opens a page in hunsu in the browser. Call it after creating a page or editing one that is not visible.",
-			InputSchema: pageArg,
-			Call:        func(_ context.Context, args json.RawMessage) (mcp.Result, error) { return text(openPage(p, hub, args)) },
-		},
+		with(getContextSpec, func(context.Context, json.RawMessage) (mcp.Result, error) { return text(workspaceOf(p, hub)) }),
+		with(checkpointSpec, func(context.Context, json.RawMessage) (mcp.Result, error) {
+			return mcp.Result{Text: "saved a point to undo to"}, assistant.Checkpoint()
+		}),
+		with(undoSpec, func(context.Context, json.RawMessage) (mcp.Result, error) {
+			return mcp.Result{Text: "restored the last checkpoint"}, assistant.Undo(hub.Current().Page)
+		}),
+		with(openPageSpec, func(_ context.Context, args json.RawMessage) (mcp.Result, error) { return text(openPage(p, hub, args)) }),
 	}
 	return append(tools, Render(p, renderer)...)
+}
+
+func with(spec mcp.Tool, call func(context.Context, json.RawMessage) (mcp.Result, error)) mcp.Tool {
+	spec.Call = call
+	return spec
 }
 
 func text(s string, err error) (mcp.Result, error) { return mcp.Result{Text: s}, err }
