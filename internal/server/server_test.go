@@ -70,8 +70,8 @@ func TestServer_API(t *testing.T) {
 	}{
 		{"UI 를 준다", "GET", "/", "", 200, "<title>hunsu", ""},
 		{"파일 목록을 JSON 으로 준다", "GET", "/api/files", "", 200, `"pages":["index.html","page.html"]`, ""},
-		{"파일 내용을 준다", "GET", "/api/file?path=page.html", "", 200, "page.html", ""},
-		{"파일을 저장한다", "PUT", "/api/file?path=page.html", "saved", 204, "", ""},
+		{"파일 내용을 그 내용의 태그와 함께 준다", "GET", "/api/file?path=page.html", "", 200, "page.html", "ETag: " + etag("page.html")},
+		{"파일을 저장하고 새 내용의 태그를 준다", "PUT", "/api/file?path=page.html", "saved", 204, "", "ETag: " + etag("saved")},
 		{"템플릿으로 새 파일을 만든다", "POST", "/api/file?path=new.html", "", 201, "", ""},
 		{"편집 대상이 아닌 파일은 거부한다", "GET", "/api/file?path=notes.txt", "", 403, "", ""},
 		{"없는 파일은 없다고 알린다", "GET", "/api/file?path=none.html", "", 404, "", ""},
@@ -119,6 +119,31 @@ func TestServer_API(t *testing.T) {
 		})
 	}
 }
+
+func TestServer_WriteIfMatch(t *testing.T) {
+	tests := []struct {
+		name       string
+		ifMatch    string
+		wantStatus int
+	}{
+		{"읽을 때 받은 태그를 보내면 저장한다", etag("page.html"), 204},
+		{"읽은 뒤로 파일이 바뀌었으면 저장하지 않는다", etag("old"), 412},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, _, _ := newServer(t)
+			req := httptest.NewRequest("PUT", "/api/file?path=page.html", strings.NewReader("saved"))
+			req.Header.Set("If-Match", tt.ifMatch)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tt.wantStatus {
+				t.Errorf("If-Match %s 로 저장 = %d %q; want %d", tt.ifMatch, rec.Code, rec.Body, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func etag(content string) string { return `"` + project.Tag([]byte(content)) + `"` }
 
 func TestServer_ExportPNG(t *testing.T) {
 	tests := []struct {
@@ -171,10 +196,11 @@ func TestServer_VariantFiles(t *testing.T) {
 func TestServer_Events(t *testing.T) {
 	tests := []struct {
 		name  string
-		watch string
+		write string
 		want  string
 	}{
-		{"감시 중인 파일이 바뀌면 그 경로를 보낸다", "page.html", "data: page.html"},
+		{"감시 중인 파일이 바뀌면 그 경로를 보낸다", "page.html", "change: page.html"},
+		{"페이지가 새로 생기면 파일 목록이 바뀌었다고 알린다", "new.html", "list: files"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -183,16 +209,16 @@ func TestServer_Events(t *testing.T) {
 			defer srv.Close()
 			ctx, cancel := context.WithTimeout(t.Context(), 2*time.Second)
 			defer cancel()
-			req, _ := http.NewRequestWithContext(ctx, "GET", srv.URL+"/api/events?path="+tt.watch, nil)
+			req, _ := http.NewRequestWithContext(ctx, "GET", srv.URL+"/api/events?path=page.html", nil)
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
 				t.Fatal(err)
 			}
 			defer res.Body.Close()
-			if err := os.WriteFile(filepath.Join(dir, tt.watch), []byte("changed"), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, tt.write), []byte("changed"), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			if got := firstData(res.Body); got != tt.want {
+			if got := firstEvent(res.Body); got != tt.want {
 				t.Errorf("첫 이벤트 = %q, want %q", got, tt.want)
 			}
 		})
@@ -232,7 +258,7 @@ func TestServer_UICommands(t *testing.T) {
 		command ui.Command
 		want    string
 	}{
-		{"서버의 명령을 파일 변경 알림과 같은 연결로 브라우저에 보낸다", ui.Command{Kind: ui.Open, Page: "a.html"}, `data: {"kind":"open","page":"a.html"}`},
+		{"서버의 명령을 파일 변경 알림과 같은 연결로 브라우저에 보낸다", ui.Command{Kind: ui.Open, Page: "a.html"}, `command: {"kind":"open","page":"a.html"}`},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -248,18 +274,24 @@ func TestServer_UICommands(t *testing.T) {
 			}
 			defer res.Body.Close()
 			hub.Send(tt.command)
-			if got := firstData(res.Body); got != tt.want {
+			if got := firstEvent(res.Body); got != tt.want {
 				t.Errorf("첫 명령 = %q, want %q", got, tt.want)
 			}
 		})
 	}
 }
 
-func firstData(body io.Reader) string {
+// firstEvent 는 SSE 의 첫 이벤트를 "이름: 데이터" 로 돌려준다.
+func firstEvent(body io.Reader) string {
 	scanner := bufio.NewScanner(body)
+	var name string
 	for scanner.Scan() {
-		if line := scanner.Text(); strings.HasPrefix(line, "data:") {
-			return line
+		line := scanner.Text()
+		if event, ok := strings.CutPrefix(line, "event: "); ok {
+			name = event
+		}
+		if data, ok := strings.CutPrefix(line, "data: "); ok {
+			return name + ": " + data
 		}
 	}
 	return ""

@@ -51,7 +51,7 @@ func New(p *project.Project, assistant *chat.Service, hub *ui.Hub, renderer Rend
 			Description: "Restores design files to the last checkpoint. It shares history with Undo in the browser, so if a browser chat request or a version restore happened after the checkpoint, it goes back to just before that first. Pages created since are removed.",
 			InputSchema: noArgs,
 			Call: func(context.Context, json.RawMessage) (mcp.Result, error) {
-				return mcp.Result{Text: "restored the last checkpoint"}, assistant.Undo()
+				return mcp.Result{Text: "restored the last checkpoint"}, assistant.Undo(hub.Current().Page)
 			},
 		},
 		{

@@ -29,6 +29,7 @@ const (
 	kindBeforeRequest = "before-request"
 	kindSaved         = "saved"
 	kindBeforeRestore = "before-restore"
+	kindBeforeUndo    = "before-undo"
 	kindRestore       = "restore"
 	kindVariant       = "variant"
 	kindChosen        = "chosen"
@@ -221,12 +222,24 @@ func (s *Service) defaultModel() string {
 	return ""
 }
 
+// 되돌리기는 디자인 파일 전체를 돌리므로 외부 에이전트의 checkpoint 뒤에 사용자가 고친 내용도 지운다.
+// 그래서 직전 상태를 버전으로 남겨 다시 찾을 수 있게 한다.
 // 되돌린 내용은 LLM 이 모르는 변경이므로 seen 을 갱신하지 않는다. 다음 요청에서 직접 고친 파일로 알려진다.
-func (s *Service) Undo() error {
+func (s *Service) Undo(page string) error {
 	if !s.mu.TryLock() {
 		return ErrBusy
 	}
 	defer s.mu.Unlock()
+	can, err := s.history.CanUndo()
+	if err != nil {
+		return err
+	}
+	if !can {
+		return history.ErrNothingToUndo
+	}
+	if _, err := s.timeline.Keep(history.Note{Kind: kindBeforeUndo}, page); err != nil {
+		return err
+	}
 	return s.history.Undo()
 }
 

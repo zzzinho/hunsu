@@ -33,6 +33,9 @@ const frameTools = createFrameTools(frame, {
 });
 
 let state = { open: null, preview: null };
+// 편집기 내용을 읽거나 저장한 때의 파일 태그. 저장할 때 그 뒤로 다른 곳에서 바뀌었는지 서버가 비교한다.
+let editorTag = null;
+let diskTag = null;
 let events;
 let running = null;
 let selection = null;
@@ -62,12 +65,21 @@ const fileURL = (path) => `/api/file?path=${encodeURIComponent(path)}`;
 
 async function request(url, options) {
   const res = await fetch(url, options);
-  if (!res.ok) throw new Error(errorMessage(await res.text(), t));
+  if (!res.ok) throw Object.assign(new Error(errorMessage(await res.text(), t)), { status: res.status });
   status.textContent = '';
   return res;
 }
 
-const readFile = async (path) => (await request(fileURL(path))).text();
+async function readFile(path) {
+  const res = await request(fileURL(path));
+  return { text: await res.text(), tag: res.headers.get('ETag') };
+}
+
+// tag 를 주면 그 뒤로 파일이 바뀌었을 때 412 로 거부된다. 새 태그를 돌려준다.
+async function writeFile(path, text, tag) {
+  const res = await request(fileURL(path), { method: 'PUT', body: text, headers: tag ? { 'If-Match': tag } : {} });
+  return res.headers.get('ETag');
+}
 
 function fileButton(path, onClick, missing = false) {
   const button = document.createElement('button');
@@ -124,13 +136,15 @@ function acceptFileDrop(target) {
 
 async function open(path) {
   if (!editor.isClean() && !confirm(t('confirm.discard'))) return;
-  const text = await readFile(path);
+  const { text, tag } = await readFile(path);
   const previousPreview = state.preview;
   state = openFile(state, path);
   editor.setOption('mode', modeOf(path));
   editor.setValue(text);
   editor.clearHistory();
   editor.markClean();
+  editorTag = tag;
+  showConflict(null);
   showDirty();
   openPath.textContent = path;
   if (state.preview !== previousPreview) {
@@ -161,6 +175,8 @@ function closeAll() {
   state = { open: null, preview: null };
   editor.setValue('');
   editor.markClean();
+  editorTag = null;
+  showConflict(null);
   openPath.textContent = '';
   frame.removeAttribute('src');
   watch();
@@ -203,9 +219,26 @@ async function create(path) {
 // 바뀐 것이 없으면 쓰지 않는다. LLM 이나 외부 에디터가 방금 쓴 내용을 다시 읽기 전 내용으로 덮어쓰지 않게.
 async function save() {
   if (!state.open || editor.isClean()) return;
-  await request(fileURL(state.open), { method: 'PUT', body: editor.getValue() });
+  try {
+    editorTag = await writeFile(state.open, editor.getValue(), editorTag);
+  } catch (error) {
+    if (error.status === 412) await checkConflict(state.open);
+    throw error;
+  }
   editor.markClean();
   showDirty();
+  showConflict(null);
+}
+
+// 편집기에 저장하지 않은 내용이 있는데 다른 곳에서 파일이 바뀌었으면 어느 쪽을 남길지 고르게 한다.
+async function checkConflict(path) {
+  const { tag } = await readFile(path);
+  if (path === state.open && tag !== editorTag) showConflict(tag);
+}
+
+function showConflict(tag) {
+  diskTag = tag;
+  $('#conflict').hidden = !tag;
 }
 
 function decodeHTML(raw) {
@@ -217,12 +250,13 @@ function decodeHTML(raw) {
 async function editText(edit) {
   const page = state.preview;
   if (state.open === page && !editor.isClean()) await save();
-  const next = replaceText(await readFile(page), edit, decodeHTML);
+  const { text, tag } = await readFile(page);
+  const next = replaceText(text, edit, decodeHTML);
   if (next === null) {
     frame.contentWindow.location.reload();
     throw new Error(t('textEdit.notFound'));
   }
-  await request(fileURL(page), { method: 'PUT', body: next });
+  await writeFile(page, next, tag);
 }
 
 async function download(kind) {
@@ -279,11 +313,14 @@ async function restoreVersion(id) {
 }
 
 async function reloadEditor(path) {
-  const text = await readFile(path);
-  if (text === editor.getValue()) return;
-  const cursor = editor.getCursor();
-  editor.setValue(text);
-  editor.setCursor(cursor);
+  const { text, tag } = await readFile(path);
+  editorTag = tag;
+  showConflict(null);
+  if (text !== editor.getValue()) {
+    const cursor = editor.getCursor();
+    editor.setValue(text);
+    editor.setCursor(cursor);
+  }
   editor.markClean();
   showDirty();
 }
@@ -295,9 +332,11 @@ function watch() {
   events.onopen = reportUI;
   events.addEventListener('change', ({ data: changed }) => {
     const reaction = reactionTo(changed, state, !editor.isClean());
-    if (reaction.preview && state.preview) frame.contentWindow.location.reload();
+    if (reaction.preview && state.preview) frameTools.reload();
     if (reaction.editor) reloadEditor(changed).catch(() => {});
+    if (reaction.conflict) checkConflict(changed).catch(() => {});
   });
+  events.addEventListener('list', () => openExisting().catch(() => {}));
   events.addEventListener('command', ({ data }) => {
     const command = JSON.parse(data);
     if (command.kind === 'open') open(command.page);
@@ -582,6 +621,11 @@ function connectResizer(handle) {
 
 editor.on('change', showDirty);
 $('#save').onclick = save;
+$('#conflict-reload').onclick = () => reloadEditor(state.open);
+$('#conflict-overwrite').onclick = () => {
+  editorTag = diskTag;
+  save();
+};
 $$('[data-width]').forEach((button) => {
   button.onclick = () => {
     deviceWidth = Number(button.dataset.width) || null;
@@ -669,7 +713,7 @@ promptInput.onkeydown = (event) => {
   }
 };
 $('#undo').onclick = async () => {
-  await request('/api/undo', { method: 'POST' });
+  await request(`/api/undo?page=${encodeURIComponent(state.preview ?? '')}`, { method: 'POST' });
   addMessage('progress', t('message.undone'));
   await openExisting();
 };

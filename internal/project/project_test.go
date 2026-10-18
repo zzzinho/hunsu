@@ -162,6 +162,29 @@ func TestProject_Write(t *testing.T) {
 	}
 }
 
+func TestProject_WriteIf(t *testing.T) {
+	tests := []struct {
+		name    string
+		path    string
+		read    string
+		wantErr error
+		want    string
+	}{
+		{"읽은 뒤로 바뀌지 않았으면 저장한다", "page.html", "page.html", nil, "saved"},
+		{"읽은 뒤로 다른 곳에서 바뀌었으면 저장하지 않는다", "page.html", "old", project.ErrChanged, "page.html"},
+		{"읽은 뒤로 지워졌으면 다시 만들지 않는다", "gone.html", "gone.html", project.ErrChanged, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p := newProject(t, "page.html")
+			err := p.WriteIf(tt.path, []byte("saved"), project.Tag([]byte(tt.read)))
+			if got, _ := p.Read(tt.path); !errors.Is(err, tt.wantErr) || string(got) != tt.want {
+				t.Errorf("WriteIf(%q) = %v, 내용 %q; want %v, %q", tt.path, err, got, tt.wantErr, tt.want)
+			}
+		})
+	}
+}
+
 func TestProject_Create(t *testing.T) {
 	p := newProject(t, "page.html")
 	tests := []struct {

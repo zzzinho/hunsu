@@ -53,6 +53,30 @@ func TestHistory_Undo(t *testing.T) {
 	}
 }
 
+func TestHistory_CanUndo(t *testing.T) {
+	tests := []struct {
+		name  string
+		saves int
+		want  bool
+	}{
+		{"저장한 시점이 있으면 되돌릴 수 있다", 1, true},
+		{"저장한 적이 없으면 되돌릴 수 없다", 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			p, _ := projecttest.New(t, nil)
+			h, err := history.New(p)
+			must(t, err)
+			for range tt.saves {
+				must(t, h.Save())
+			}
+			if got, err := h.CanUndo(); got != tt.want || err != nil {
+				t.Errorf("CanUndo() = %v, %v; want %v", got, err, tt.want)
+			}
+		})
+	}
+}
+
 func TestHistory_Snapshots(t *testing.T) {
 	tests := []struct {
 		name string
