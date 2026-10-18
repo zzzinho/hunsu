@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"crypto/subtle"
@@ -115,8 +116,39 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, response{JSONRPC: "2.0", Error: &rpcError{codeParse, err.Error()}})
 		return
 	}
-	// 2025-03-26 은 여러 요청을 배열로 묶어 보낼 수 있다(batch). 응답도 배열로, 알림에는 답하지 않는다.
+	if out := s.reply(r.Context(), body); out != nil {
+		writeJSON(w, out)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+// ServeStdio 는 표준 입출력으로 MCP 를 주고받는다. 한 줄에 메시지 하나다. r 이 끝나면 nil 을 돌려준다.
+func (s *Server) ServeStdio(ctx context.Context, r io.Reader, w io.Writer) error {
+	scanner := bufio.NewScanner(r)
+	scanner.Buffer(nil, maxMessage)
+	encoder := json.NewEncoder(w)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		if out := s.reply(ctx, line); out != nil {
+			if err := encoder.Encode(out); err != nil {
+				return err
+			}
+		}
+	}
+	return scanner.Err()
+}
+
+const maxMessage = 16 << 20
+
+// reply 는 메시지 하나에 대한 답이다. 알림에는 답하지 않으므로 답할 것이 없으면 nil 이다.
+// 2025-03-26 은 여러 요청을 배열로 묶어 보낼 수 있다(batch). 그때는 답도 배열이다.
+func (s *Server) reply(ctx context.Context, body []byte) any {
 	var requests []request
+	var err error
 	batch := len(bytes.TrimSpace(body)) > 0 && bytes.TrimSpace(body)[0] == '['
 	if batch {
 		err = json.Unmarshal(body, &requests)
@@ -125,25 +157,23 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		err = json.Unmarshal(body, &requests[0])
 	}
 	if err != nil {
-		writeJSON(w, response{JSONRPC: "2.0", Error: &rpcError{codeParse, err.Error()}})
-		return
+		return response{JSONRPC: "2.0", Error: &rpcError{codeParse, err.Error()}}
 	}
 	var responses []response
 	for _, req := range requests {
 		if req.ID == nil {
 			continue
 		}
-		result, rpcErr := s.handle(r.Context(), req)
+		result, rpcErr := s.handle(ctx, req)
 		responses = append(responses, response{JSONRPC: "2.0", ID: req.ID, Result: result, Error: rpcErr})
 	}
 	switch {
 	case len(responses) == 0:
-		w.WriteHeader(http.StatusAccepted)
+		return nil
 	case batch:
-		writeJSON(w, responses)
-	default:
-		writeJSON(w, responses[0])
+		return responses
 	}
+	return responses[0]
 }
 
 func (s *Server) handle(ctx context.Context, req request) (any, *rpcError) {
