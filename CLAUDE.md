@@ -26,6 +26,8 @@ Semantic Versioning 을 따른다. main 에 병합하면 병합 커밋에 annota
 - PATCH: 결함을 고쳤거나 동작 약속은 그대로인 개선이다.
 - 문서만 바꾼 병합에는 달지 않는다.
 
+태그를 달 때 `.claude-plugin/plugin.json` 의 `version` 도 같은 값으로 올린다. 올리지 않으면 플러그인 사용자에게 업데이트가 가지 않는다.
+
 태그는 main 을 push 할 때 함께 올린다: `git push --follow-tags origin main`.
 
 ## 설계

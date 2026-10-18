@@ -42,6 +42,7 @@ HTML 로 디자인하는 로컬 디자인 도구. 원본을 직접 고치거나 
 | 모델 | provider 가 목록과 기본값(첫 번째)을 정한다. 화면은 `/api/models` | claude provider: opus(기본)·sonnet·haiku. haiku 는 2배 빠르고 20배 싸다 (11) |
 | 캔버스 | 파일 1개 미리보기 + 모바일/데스크톱 너비 | 다중 프레임은 MVP 핵심과 무관 |
 | 외부 에이전트 | MCP 서버 `/mcp` | 클라이언트(Claude Code, Codex 등)에 묶이지 않는 표준 (7) |
+| Claude Code 플러그인 | 저장소가 곧 마켓플레이스·플러그인. 처음 쓸 때 소스로 빌드, MCP 는 `hunsu mcp` 중계, 사용법은 스킬 | 설치·MCP 등록·사용법을 한 번에 준다. 핵심 코드는 클라이언트를 전제하지 않는다 (7) |
 | 동시 실행 | 폴더마다 프로세스 하나. 같은 폴더를 다시 실행하면 떠 있는 화면을 연다(`.hunsu/lock` 파일 잠금) | 프로세스끼리 독립이다. 한 폴더를 두 프로세스가 맡으면 `.hunsu/` 와 실행 잠금이 갈린다 (7) |
 | 배포 (v1) | GitHub 에서 클론해 소스로 빌드. 바이너리 배포 없음 | tap·토큰·태그를 관리하지 않는다. 직접 빌드한 바이너리는 Gatekeeper 격리 속성이 없다. 사용자는 이미 provider CLI 를 써서 Go 설치 부담이 작다 |
 | provider 연결 (v1) | 각 CLI 의 로그인을 쓴다. hunsu 는 키를 갖지 않는다 | `claude auth status --json`, `codex login status` 로 확인하고 로그인 명령을 안내 |
@@ -172,6 +173,20 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 - 되돌리기 직전 상태를 버전으로 남긴다. 되돌리기는 프로젝트 전체를 돌리므로 checkpoint 뒤에 사용자가 고친 내용도 지운다.
 - 브라우저 채팅이 실행되는 동안에는 지금처럼 편집을 잠근다 (6).
 
+**중계 (`hunsu mcp`)**: 표준 입출력 MCP 서버. 클라이언트에 한 번만 등록하면 폴더마다 등록하지 않아도 된다.
+
+- 시작할 때는 hunsu 를 띄우지 않는다. 도구 목록과 안내문을 스스로 알린다. 플러그인이 켜진 모든 프로젝트에서 시작되므로 폴더에 아무것도 만들지 않는다.
+- 도구마다 `folder` 인자(디자인 폴더, 상대 경로는 기본 폴더 기준)를 더한다. 기본 폴더는 `-dir`, 없으면 작업 폴더다.
+- 호출하면 그 폴더를 맡은 hunsu(`.hunsu/lock` 의 주소)로 `folder` 를 뺀 인자를 그대로 중계한다. 떠 있지 않으면 띄우고(브라우저도 연다) 중계가 끝날 때 함께 끈다.
+
+**Claude Code 플러그인**: 저장소 루트가 플러그인이다.
+
+- `.claude-plugin/marketplace.json`(`"source": "."`), `plugin.json`. MCP 서버는 `plugin.json` 안에 둔다. 루트 `.mcp.json` 은 이 저장소를 연 Claude Code 가 프로젝트 MCP 로 읽는다.
+- MCP: `${CLAUDE_PLUGIN_ROOT}/bin/hunsu mcp -dir ${CLAUDE_PROJECT_DIR}`. 플러그인의 `bin/` 은 셸 PATH 에만 들어가고 MCP 명령에서는 찾지 못한다 (11).
+- `bin/hunsu`: 셸 스크립트. 빌드한 실행파일이 없거나 소스가 더 새로우면 `~/Library/Caches/hunsu/` 에 `go build` 한 뒤 실행한다. Go 가 없으면 설치 방법을 알린다.
+- `skills/hunsu/SKILL.md`: 언제 쓰는지와 `folder` 를 고르는 법. 작업 순서·디자인 규칙은 MCP 안내문에 이미 있어 되풀이하지 않는다.
+- `plugin.json` 의 `version` 은 태그와 같게 둔다. 올려야 사용자에게 업데이트가 간다.
+
 ## 8. 화면
 
 - 패널: 파일 / 렌더 / 편집기·채팅. 접기(⌘\ 는 렌더만), 경계 끌어 크기 조절(렌더 320px·편집기 120px 은 남긴다). 상태는 localStorage.
@@ -216,6 +231,7 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 
 **v1 이후**
 
+- [ ] 15. Claude Code 플러그인: `hunsu mcp` 중계, 플러그인·마켓플레이스, 사용법 스킬 (7)
 - [x] 14. 여러 폴더 동시 실행: 폴더별 고정 포트, 같은 폴더를 다시 실행하면 떠 있는 화면 열기 (3, 7)
 - [x] 13. 동시 작업: 외부 에이전트와 사용자가 함께 고쳐도 작업이 말없이 사라지지 않는다. 파일 목록 변경 알림, 저장 충돌 감지와 선택, 텍스트 수정 중 새로고침 미룸, 되돌리기 전 버전 (7)
 
@@ -282,5 +298,13 @@ claude -p [--resume <id>] --safe-mode --restricted --strict-mcp-config
 | 모델 | gpt-5.6-sol·terra·luna, gpt-5.5 모두 된다. 짧은 답 5~7초 |
 
 **답변 언어** (2026-10-12): 한국어 디자인 파일에 영어로 요청하면 opus 는 영어로, haiku 는 한국어로 답할 때가 있다. 빈 폴더에서는 둘 다 요청의 언어로 답한다.
+
+**플러그인** (2026-10-18, claude 2.1.302, `--plugin-dir`)
+
+| 질문 | 결과 |
+|---|---|
+| 저장소 루트를 플러그인으로(`"source": "."`) | `claude plugin validate` 통과 |
+| stdio MCP 서버의 작업 폴더·환경 | Claude Code 를 연 폴더. `CLAUDE_PROJECT_DIR` 가 같은 값, `${CLAUDE_PLUGIN_ROOT}`·`${CLAUDE_PROJECT_DIR}` 를 인자에서 치환한다 |
+| `bin/` 의 실행파일 | 셸(Bash 도구) PATH 에는 들어간다. MCP 서버 `command` 에 이름만 쓰면 찾지 못한다 |
 
 **MCP** (클라이언트: Claude Code, haiku): 선택 요소 색 변경 + 새 페이지 + 열기 14.7초. 도구 순서 `get_context` → `checkpoint` → 편집 → `open_page`. 브라우저 [되돌리기] 한 번으로 모두 복원. 토큰 없는 `/mcp` 401, 다른 출처 `/api/ui` 403.
