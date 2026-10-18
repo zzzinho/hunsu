@@ -713,7 +713,7 @@ promptInput.onkeydown = (event) => {
   }
 };
 $('#undo').onclick = async () => {
-  await request('/api/undo', { method: 'POST' });
+  await request(`/api/undo?page=${encodeURIComponent(state.preview ?? '')}`, { method: 'POST' });
   addMessage('progress', t('message.undone'));
   await openExisting();
 };

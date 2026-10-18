@@ -46,7 +46,7 @@ func (s *Server) resetChat(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) undo(w http.ResponseWriter, r *http.Request) {
-	if err := s.chat.Undo(); err != nil {
+	if err := s.chat.Undo(r.URL.Query().Get("page")); err != nil {
 		writeError(w, err)
 		return
 	}

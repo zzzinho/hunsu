@@ -40,6 +40,11 @@ func (h *History) Save() error {
 	return prune(h.state, dir, append(names, snapshot), keepSnapshots)
 }
 
+func (h *History) CanUndo() (bool, error) {
+	names, err := numbered(h.state, dir)
+	return len(names) > 0, err
+}
+
 func (h *History) Undo() error {
 	names, err := numbered(h.state, dir)
 	if err != nil {

@@ -10,6 +10,7 @@ const kindKeys = {
   'before-request': 'version.beforeRequest',
   saved: 'version.saved',
   'before-restore': 'version.beforeRestore',
+  'before-undo': 'version.beforeUndo',
   restore: 'version.restore',
   variant: 'version.variant',
   chosen: 'version.chosen',

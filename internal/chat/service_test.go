@@ -380,17 +380,26 @@ func TestService(t *testing.T) {
 			func(f *fixture) string {
 				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
 				f.send(chat.Turn{Prompt: "고쳐"})
-				f.must(f.svc.Undo())
+				f.must(f.svc.Undo("a.html"))
 				data, err := f.project.Read("a.html")
 				f.must(err)
 				return string(data)
 			},
 			"a"},
+		{"되돌리기 직전 상태를 버전으로 남긴다",
+			func(f *fixture) string {
+				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
+				f.send(chat.Turn{Page: "a.html", Prompt: "고쳐"})
+				f.must(f.project.Write("a.html", []byte("직접 고침")))
+				f.must(f.svc.Undo("a.html"))
+				return f.read("a.html") + " / " + f.versions()
+			},
+			"a / 3:before-undo:a.html 2:request 고쳐:a.html 1:before-request:a.html"},
 		{"되돌려도 사용자가 올린 에셋은 남긴다",
 			func(f *fixture) string {
 				f.send(chat.Turn{Prompt: "고쳐"})
 				f.must(f.project.AddAsset("logo.png", strings.NewReader("png")))
-				f.must(f.svc.Undo())
+				f.must(f.svc.Undo("a.html"))
 				listing, err := f.project.List()
 				f.must(err)
 				return strings.Join(listing.Assets, ",")
@@ -446,7 +455,7 @@ func TestService(t *testing.T) {
 		{"없는 버전으로는 복원하지 않고 아무것도 남기지 않는다",
 			func(f *fixture) string {
 				err := f.svc.Restore(9, "a.html")
-				return fmt.Sprint(errors.Is(err, history.ErrNoVersion), " ", errors.Is(f.svc.Undo(), history.ErrNothingToUndo), " [", f.versions(), "]")
+				return fmt.Sprint(errors.Is(err, history.ErrNoVersion), " ", errors.Is(f.svc.Undo("a.html"), history.ErrNothingToUndo), " [", f.versions(), "]")
 			},
 			"true true []"},
 		{"복원은 되돌리기로 취소할 수 있다",
@@ -454,7 +463,7 @@ func TestService(t *testing.T) {
 				f.runner.writes = map[string]string{"a.html": "LLM 이 고침"}
 				f.send(chat.Turn{Page: "a.html", Prompt: "고쳐"})
 				f.must(f.svc.Restore(1, "a.html"))
-				f.must(f.svc.Undo())
+				f.must(f.svc.Undo("a.html"))
 				return f.read("a.html")
 			},
 			"LLM 이 고침"},
@@ -524,7 +533,7 @@ func TestService(t *testing.T) {
 				f.runner.writes = map[string]string{"a.html": "안 {dir}"}
 				f.sendVariants(chat.Turn{Page: "a.html", Prompt: "둥글게"}, 2)
 				f.must(f.svc.ChooseVariant(1, "a.html"))
-				f.must(f.svc.Undo())
+				f.must(f.svc.Undo("a.html"))
 				return f.read("a.html")
 			},
 			"a"},
@@ -589,7 +598,7 @@ func TestService(t *testing.T) {
 				go func() { done <- f.send(chat.Turn{Prompt: "1"}) }()
 				<-f.runner.started
 				_, saveErr := f.svc.SaveVersion("a.html")
-				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(llm.Event) {}), " / ", f.svc.Undo(), " / ", f.svc.Checkpoint(),
+				got := fmt.Sprint(f.svc.Send(context.Background(), chat.Turn{Prompt: "2"}, func(llm.Event) {}), " / ", f.svc.Undo("a.html"), " / ", f.svc.Checkpoint(),
 					" / ", saveErr, " / ", f.svc.Restore(1, "a.html"),
 					" / ", f.svc.SendVariants(context.Background(), chat.Turn{Prompt: "3"}, 2, func(llm.Event) {}),
 					" / ", f.svc.ChooseVariant(1, ""), " / ", f.svc.DiscardVariants())

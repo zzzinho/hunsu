@@ -22,6 +22,7 @@ test('versionLabel', (t) => table(t, [
   ['요청 전 상태', { kind: 'before-request' }, 'Before request'],
   ['직접 저장한 버전', { kind: 'saved' }, 'Saved by you'],
   ['복원 전 상태', { kind: 'before-restore' }, 'Before restore'],
+  ['되돌리기 전 상태', { kind: 'before-undo' }, 'Before undo'],
   ['복원한 버전은 복원한 번호와 함께', { kind: 'restore', ref: 3 }, 'Restored v3'],
   ['고르지 않은 비교안은 안 번호와 요청 내용으로', { kind: 'variant', ref: 1, text: '둥글게' }, 'Take 1 · 둥글게'],
   ['고른 비교안은 고른 안 번호와 요청 내용으로', { kind: 'chosen', ref: 2, text: '둥글게' }, 'Picked take 2 · 둥글게'],
