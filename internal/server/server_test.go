@@ -70,8 +70,8 @@ func TestServer_API(t *testing.T) {
 	}{
 		{"UI 를 준다", "GET", "/", "", 200, "<title>hunsu", ""},
 		{"파일 목록을 JSON 으로 준다", "GET", "/api/files", "", 200, `"pages":["index.html","page.html"]`, ""},
-		{"파일 내용을 준다", "GET", "/api/file?path=page.html", "", 200, "page.html", ""},
-		{"파일을 저장한다", "PUT", "/api/file?path=page.html", "saved", 204, "", ""},
+		{"파일 내용을 그 내용의 태그와 함께 준다", "GET", "/api/file?path=page.html", "", 200, "page.html", "ETag: " + etag("page.html")},
+		{"파일을 저장하고 새 내용의 태그를 준다", "PUT", "/api/file?path=page.html", "saved", 204, "", "ETag: " + etag("saved")},
 		{"템플릿으로 새 파일을 만든다", "POST", "/api/file?path=new.html", "", 201, "", ""},
 		{"편집 대상이 아닌 파일은 거부한다", "GET", "/api/file?path=notes.txt", "", 403, "", ""},
 		{"없는 파일은 없다고 알린다", "GET", "/api/file?path=none.html", "", 404, "", ""},
@@ -119,6 +119,31 @@ func TestServer_API(t *testing.T) {
 		})
 	}
 }
+
+func TestServer_WriteIfMatch(t *testing.T) {
+	tests := []struct {
+		name       string
+		ifMatch    string
+		wantStatus int
+	}{
+		{"읽을 때 받은 태그를 보내면 저장한다", etag("page.html"), 204},
+		{"읽은 뒤로 파일이 바뀌었으면 저장하지 않는다", etag("old"), 412},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			h, _, _ := newServer(t)
+			req := httptest.NewRequest("PUT", "/api/file?path=page.html", strings.NewReader("saved"))
+			req.Header.Set("If-Match", tt.ifMatch)
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != tt.wantStatus {
+				t.Errorf("If-Match %s 로 저장 = %d %q; want %d", tt.ifMatch, rec.Code, rec.Body, tt.wantStatus)
+			}
+		})
+	}
+}
+
+func etag(content string) string { return `"` + project.Tag([]byte(content)) + `"` }
 
 func TestServer_ExportPNG(t *testing.T) {
 	tests := []struct {

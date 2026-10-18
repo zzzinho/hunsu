@@ -1,6 +1,8 @@
 package project
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"io/fs"
 	"os"
@@ -9,7 +11,10 @@ import (
 	"strings"
 )
 
-var ErrNotEditable = errors.New("not an editable file")
+var (
+	ErrNotEditable = errors.New("not an editable file")
+	ErrChanged     = errors.New("the file changed since it was read")
+)
 
 var designSystem = []string{"DESIGN.md", "design.css"}
 
@@ -116,6 +121,24 @@ func (p *Project) Write(name string, data []byte) error {
 		return err
 	}
 	return p.root.Rename(tmp, name)
+}
+
+// Tag 는 내용을 나타내는 값이다. 읽은 뒤로 파일이 바뀌었는지 비교하는 데 쓴다.
+func Tag(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+// WriteIf 는 파일 내용이 아직 tag 일 때만 쓴다. hunsu 를 거치지 않는 외부 에이전트의 변경을 덮어쓰지 않게 한다.
+func (p *Project) WriteIf(name string, data []byte, tag string) error {
+	current, err := p.Read(name)
+	if errors.Is(err, fs.ErrNotExist) || err == nil && Tag(current) != tag {
+		return ErrChanged
+	}
+	if err != nil {
+		return err
+	}
+	return p.Write(name, data)
 }
 
 func (p *Project) Create(name string) error {

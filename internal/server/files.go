@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"strings"
 
 	"hunsu/internal/chat"
 	"hunsu/internal/export"
@@ -23,6 +24,7 @@ var errorStatus = []struct {
 	code   string
 }{
 	{project.ErrNotEditable, http.StatusForbidden, "not-editable"},
+	{project.ErrChanged, http.StatusPreconditionFailed, "changed"},
 	{project.ErrNotAsset, http.StatusUnsupportedMediaType, "not-asset"},
 	{project.ErrTooLarge, http.StatusRequestEntityTooLarge, "too-large"},
 	{export.ErrNotPage, http.StatusNotFound, "not-page"},
@@ -57,20 +59,30 @@ func (s *Server) read(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("ETag", etag(data))
 	w.Write(data)
 }
 
+// If-Match 가 있으면 화면이 읽은 뒤로 파일이 바뀌지 않았을 때만 쓴다.
 func (s *Server) write(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Query().Get("path")
 	data, err := io.ReadAll(r.Body)
-	if err == nil {
-		err = s.project.Write(r.URL.Query().Get("path"), data)
+	switch match := r.Header.Get("If-Match"); {
+	case err != nil:
+	case match == "":
+		err = s.project.Write(path, data)
+	default:
+		err = s.project.WriteIf(path, data, strings.Trim(match, `"`))
 	}
 	if err != nil {
 		writeError(w, err)
 		return
 	}
+	w.Header().Set("ETag", etag(data))
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func etag(data []byte) string { return `"` + project.Tag(data) + `"` }
 
 func (s *Server) create(w http.ResponseWriter, r *http.Request) {
 	if err := s.project.Create(r.URL.Query().Get("path")); err != nil {

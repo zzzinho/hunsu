@@ -86,6 +86,11 @@
   <div class="bar">
     <span id="open-path"></span>
     <button id="save" data-i18n="save">Save</button>
+    <div id="conflict" role="alert" hidden>
+      <span data-i18n="conflict.message">This file changed elsewhere while you were editing. Reload drops your edits; Overwrite drops the other changes.</span>
+      <button id="conflict-reload" data-i18n="conflict.reload">Reload</button>
+      <button id="conflict-overwrite" data-i18n="conflict.overwrite">Overwrite</button>
+    </div>
   </div>
   <div id="editor"></div>
   <section class="chat" aria-label="Chat" data-i18n-label="chat.label">

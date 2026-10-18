@@ -30,4 +30,5 @@ export const watchList = ({ open, preview }) => [...new Set([open, preview, DESI
 export const reactionTo = (changed, state, dirty) => ({
   preview: changed === state.preview || changed === DESIGN_CSS,
   editor: changed === state.open && !dirty,
+  conflict: changed === state.open && dirty,
 });

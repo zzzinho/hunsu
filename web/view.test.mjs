@@ -41,8 +41,8 @@ test('watchList', (t) => table(t, [
 ], (state, want) => assert.deepEqual(watchList(state), want)));
 
 test('reactionTo', (t) => table(t, [
-  ['열린 페이지가 바뀌면 렌더 화면과 에디터를 새로고침한다', 'a.html', pageOpen, false, { preview: true, editor: true }],
-  ['저장하지 않은 편집이 있으면 에디터는 덮어쓰지 않는다', 'a.html', pageOpen, true, { preview: true, editor: false }],
-  ['design.css 가 바뀌면 렌더 화면을 새로고침한다', 'design.css', pageOpen, false, { preview: true, editor: false }],
-  ['렌더 중이 아닌 파일이 바뀌면 렌더 화면은 그대로 둔다', 'DESIGN.md', designOpen, false, { preview: false, editor: true }],
+  ['열린 페이지가 바뀌면 렌더 화면과 에디터를 새로고침한다', 'a.html', pageOpen, false, { preview: true, editor: true, conflict: false }],
+  ['저장하지 않은 편집이 있으면 에디터는 덮어쓰지 않고 충돌을 확인한다', 'a.html', pageOpen, true, { preview: true, editor: false, conflict: true }],
+  ['design.css 가 바뀌면 렌더 화면을 새로고침한다', 'design.css', pageOpen, false, { preview: true, editor: false, conflict: false }],
+  ['렌더 중이 아닌 파일이 바뀌면 렌더 화면은 그대로 둔다', 'DESIGN.md', designOpen, false, { preview: false, editor: true, conflict: false }],
 ], (changed, state, dirty, want) => assert.deepEqual(reactionTo(changed, state, dirty), want)));
