@@ -53,7 +53,7 @@ The screen has a file panel, render view, and editor & chat panel. Drag borders 
 - The conversation continues per project. New chat starts over.
 - Choose Compare 2 or Compare 3 before sending to build takes in different directions (faithful, bold, restrained) at once. Compare them side by side; Pick this one makes it the current state and keeps the others as versions. Your files stay untouched until you pick.
 - Undo restores the state before the last request; repeat to go further back.
-- Versions lists the version saved after every request, with thumbnails. Restore any of them (Undo reverts a restore too), or save one yourself with Save current state. The last 100 are kept.
+- Versions lists the versions saved after every request and before every undo, with thumbnails. Restore any of them (Undo reverts a restore too), or save one yourself with Save current state. The last 100 are kept.
 - Models come from the provider. The claude provider defaults to opus, with sonnet and haiku. A new page takes about 1 min 40 s with opus, about 30 s with haiku.
 
 **Select an element**
@@ -114,6 +114,8 @@ hunsu runs a standard MCP (Streamable HTTP) server. Agents read the browser stat
 | `undo` | Restore the last checkpoint |
 | `open_page` | Open a page in the browser |
 | `screenshot` | Rendered image of a page (when Chrome is available) |
+
+You can keep editing in hunsu while the agent works. New pages show up in the file list right away. If the agent changes a file that has unsaved edits in the editor, you choose Reload or Overwrite.
 
 The token is created once at `~/Library/Application Support/hunsu/mcp-token` (0600) and reused.
 
