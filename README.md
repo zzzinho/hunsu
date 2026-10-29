@@ -38,7 +38,7 @@ sudo mv hunsu /usr/local/bin/   # 어디서나 hunsu 로 실행하려면
 ## 실행
 
 ```bash
-hunsu ~/designs      # 생략하면 현재 디렉터리
+hunsu ~/designs      # 생략하면 현재 디렉터리. 옵션은 폴더 앞뒤 어디에 써도 된다
 ```
 
 폴더마다 정해진 포트에 뜨고 브라우저가 열린다. 처음 연 폴더는 `http://127.0.0.1:7777`, 다음 폴더부터 7778, 7779… 를 쓰고, 다시 실행해도 같은 포트를 쓴다(`~/Library/Application Support/hunsu/ports.json`). 여러 폴더를 동시에 띄울 수 있고, 이미 떠 있는 폴더를 다시 실행하면 그 화면을 연다. `-port 8888` 은 그 실행에만 다른 포트를 쓴다, `-no-open` 으로 브라우저 열기 생략. `-provider codex` 로 LLM 을 고른다(생략하면 설치된 것을 claude → codex 순으로). 설치·로그인이 안 됐으면 터미널과 채팅 창에 실행할 명령을 알린다.
