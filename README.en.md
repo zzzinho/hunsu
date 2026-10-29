@@ -40,7 +40,7 @@ To update, run `git pull` in the cloned folder, then build and move it again.
 ## Run
 
 ```bash
-hunsu ~/designs      # defaults to the current directory
+hunsu ~/designs      # defaults to the current directory. Flags may go before or after the folder
 ```
 
 Serves at the folder's own port and opens your browser. The first folder you open gets `http://127.0.0.1:7777`, the next ones 7778, 7779…, and each folder keeps its port across runs (`~/Library/Application Support/hunsu/ports.json`). You can run several folders at once; running a folder that is already open opens its page. `-port 8888` uses another port for that run only, `-no-open` skips the browser. `-provider codex` picks the LLM (by default the first installed of claude, codex). If it is not installed or logged in, the terminal and the chat tell you which command to run.

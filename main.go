@@ -7,6 +7,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"io/fs"
 	"net"
 	"net/http"
@@ -42,17 +43,59 @@ func version() string {
 //go:embed web
 var webFiles embed.FS
 
+type options struct {
+	dir      string
+	port     int
+	open     bool
+	provider string
+	version  bool
+}
+
+var errTooManyFolders = errors.New("give one folder")
+
+func parseArgs(args []string, output io.Writer) (options, error) {
+	flags := flag.NewFlagSet("hunsu", flag.ContinueOnError)
+	flags.SetOutput(output)
+	flags.Usage = func() {
+		fmt.Fprintln(output, "Usage: hunsu [flags] [folder]\n\nServes the design folder (default: the current directory). Flags may come before or after the folder.\n\nFlags:")
+		flags.PrintDefaults()
+	}
+	noOpen := flags.Bool("no-open", false, "do not open the browser")
+	port := flags.Int("port", 0, "server port for this run (default: the folder's own port, starting at 7777)")
+	providerName := flags.String("provider", "", "LLM for the browser chat: claude or codex. Defaults to the first installed of claude, codex")
+	showVersion := flags.Bool("version", false, "print the version and exit")
+	if err := flags.Parse(args); err != nil {
+		return options{}, err
+	}
+	dir := cmp.Or(flags.Arg(0), ".")
+	// flag 는 첫 위치 인자에서 멈춘다. `hunsu ~/designs -port 8888` 의 옵션을 버리지 않게 폴더 뒤를 다시 읽는다.
+	if flags.NArg() > 0 {
+		if err := flags.Parse(flags.Args()[1:]); err != nil {
+			return options{}, err
+		}
+	}
+	if flags.NArg() > 0 {
+		err := fmt.Errorf("%w, got also %s", errTooManyFolders, strings.Join(flags.Args(), " "))
+		fmt.Fprintln(output, err)
+		flags.Usage()
+		return options{}, err
+	}
+	return options{dir: dir, port: *port, open: !*noOpen, provider: *providerName, version: *showVersion}, nil
+}
+
 func main() {
-	noOpen := flag.Bool("no-open", false, "do not open the browser")
-	port := flag.Int("port", 0, "server port for this run (default: the folder's own port, starting at 7777)")
-	providerName := flag.String("provider", "", "LLM for the browser chat: claude or codex. Defaults to the first installed of claude, codex")
-	showVersion := flag.Bool("version", false, "print the version and exit")
-	flag.Parse()
-	if *showVersion {
+	opts, err := parseArgs(os.Args[1:], os.Stderr)
+	if errors.Is(err, flag.ErrHelp) {
+		return
+	}
+	if err != nil {
+		os.Exit(2)
+	}
+	if opts.version {
 		fmt.Println("hunsu", version())
 		return
 	}
-	if err := run(cmp.Or(flag.Arg(0), "."), *port, !*noOpen, *providerName); err != nil {
+	if err := run(opts.dir, opts.port, opts.open, opts.provider); err != nil {
 		fmt.Fprintln(os.Stderr, "hunsu:", err)
 		os.Exit(1)
 	}
