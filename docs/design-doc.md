@@ -259,6 +259,7 @@ type Provider interface {
 | A1 | 실행 형태 | CLI `./hunsu [폴더]` | `.app` | Finder 로 실행하면 셸 PATH 를 물려받지 못해 provider CLI 를 못 찾는다 |
 | A2 | 런타임 | Go (약 10MB) | `bun --compile` | 60MB 이상. Go 는 embed·HTTP·프로세스 실행이 표준 라이브러리 |
 | A3 | 에디터 | CodeMirror 5 파일 포함 | CodeMirror 6 / textarea | CM6 은 번들러가 필요하다(빌드 단계 없음 원칙과 충돌). textarea 는 구문 강조·줄 번호·들여쓰기가 없다 |
+| A27 | 플러그인의 MCP 연결 | stdio 중계 `hunsu mcp` | 플러그인에 http 주소를 넣는다 | 플러그인 설정은 모든 프로젝트에 같아 폴더별 포트를 담을 수 없다. `headersHelper` 는 헤더만 바꾼다. 중계는 다른 클라이언트도 한 번만 등록하게 한다 |
 | A26 | 여러 폴더 동시 사용 | 폴더마다 프로세스, 폴더별 고정 포트 | 한 프로세스가 여러 폴더를 맡는다(`/w/<id>/`, MCP 도구에 폴더 인자) | 변경이 크고, 처음 띄운 프로세스를 끄면 모든 폴더가 꺼진다. 대신 MCP 를 폴더마다 등록해야 한다 |
 | A16 | 배포 | GitHub 에서 클론해 소스 빌드 | Homebrew tap / 서명·공증 다운로드 / Release 바이너리 | tap 은 별도 저장소·토큰·태그 관리가 든다. 서명·공증은 Apple 개발자 등록이 필요하다. 브라우저로 받은 서명 없는 바이너리는 `xattr` 로 격리 속성을 지워야 한다. 직접 빌드한 바이너리는 격리 속성이 없고, 사용자는 이미 provider CLI 를 써서 Go 설치 부담이 작다 |
 

@@ -93,6 +93,32 @@ func TestServer(t *testing.T) {
 	}
 }
 
+func TestServer_ServeStdio(t *testing.T) {
+	s := mcp.NewServer(mcp.Info{Name: "hunsu", Version: "test"}, "안내문", echo)
+	parseErr := json.Unmarshal([]byte("x"), new(any)).Error()
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{"한 줄에 요청 하나를 받아 한 줄로 답한다",
+			rpc("tools/call", `{"name":"echo","arguments":{"text":"안녕"}}`) + "\n" + rpc("ping", `{}`) + "\n",
+			`{"jsonrpc":"2.0","id":1,"result":{"content":[{"type":"text","text":"안녕"}]}}` + "\n" + `{"jsonrpc":"2.0","id":1,"result":{}}` + "\n"},
+		{"알림에는 답하지 않는다", `{"jsonrpc":"2.0","method":"notifications/initialized"}` + "\n", ""},
+		{"읽을 수 없는 줄에는 파싱 오류로 답하고 다음 줄을 읽는다", "x\n" + rpc("ping", `{}`) + "\n",
+			`{"jsonrpc":"2.0","id":null,"error":{"code":-32700,"message":"` + parseErr + `"}}` + "\n" + `{"jsonrpc":"2.0","id":1,"result":{}}` + "\n"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var out strings.Builder
+			err := s.ServeStdio(context.Background(), strings.NewReader(tt.input), &out)
+			if out.String() != tt.want || err != nil {
+				t.Errorf("ServeStdio() = %q, %v; want %q", out.String(), err, tt.want)
+			}
+		})
+	}
+}
+
 func TestRequireToken(t *testing.T) {
 	h := mcp.RequireToken("secret", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
 	tests := []struct {

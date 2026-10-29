@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -154,4 +155,34 @@ func TestTools(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSpecs(t *testing.T) {
+	tests := []struct {
+		name     string
+		renderer mcptools.Renderer
+	}{
+		{"Chrome 이 있으면 screenshot 까지 hunsu 의 도구와 같은 이름·설명·인자를 알린다", fakeRenderer{}},
+		{"Chrome 이 없으면 screenshot 을 빼고 hunsu 의 도구와 같은 이름·설명·인자를 알린다", nil},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			f := newFixture(t)
+			svc, err := chat.New(f.project, idleProvider{}, chat.Options{})
+			f.must(err)
+			want := withoutCalls(mcptools.New(f.project, svc, f.hub, tt.renderer))
+			if got := withoutCalls(mcptools.Specs(tt.renderer != nil)); !reflect.DeepEqual(got, want) {
+				t.Errorf("Specs() = %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+func withoutCalls(tools []mcp.Tool) []mcp.Tool {
+	out := make([]mcp.Tool, len(tools))
+	for i, tool := range tools {
+		tool.Call = nil
+		out[i] = tool
+	}
+	return out
 }
